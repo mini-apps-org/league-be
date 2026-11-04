@@ -1,0 +1,25 @@
+# Air hot-reload config.
+#
+# This file is REQUIRED, not optional. Air's default build command is
+# `go build -o ./tmp/main .`, which builds the package in this directory. That
+# package is not `main`, so `go build -o` emits a non-executable ar archive and
+# Air then fails with "Permission denied". Pointing cmd at ./cmd/server is what
+# makes Air produce an actual binary.
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/main ./cmd/server"
+  bin = "./tmp/main"
+  # yaml matters: internal/platform/config/*.yaml is compiled in with go:embed,
+  # so editing one has no effect until the binary is rebuilt.
+  include_ext = ["go", "yaml", "yml", "toml"]
+  exclude_dir = ["tmp", "bin", "docs", "testdata"]
+  delay = 300
+  stop_on_error = true
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true
