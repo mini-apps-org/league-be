@@ -33,4 +33,4 @@ domains:
     - https://*.vercel.app
   frontend_origins:
     - http://localhost:*
-    - http://localhost:5173
+    - http://localhost:5174

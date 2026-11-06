@@ -61,8 +61,8 @@ func Load() (*Config, error) {
 	config.Auth.GoogleOAuthClientID = os.Getenv("GOOGLE_OAUTH_CLIENT_ID")
 	config.Auth.GoogleOAuthClientSecret = os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET")
 
-	config.BaseURL = strings.TrimSuffix(envOr("BASE_URL", "http://localhost:9999"), "/")
-	config.FrontendURL = strings.TrimSuffix(envOr("FRONTEND_URL", "http://localhost:5173"), "/")
+	config.BaseURL = strings.TrimSuffix(envOr("BASE_URL", "http://localhost:9200"), "/")
+	config.FrontendURL = strings.TrimSuffix(envOr("FRONTEND_URL", "http://localhost:5174"), "/")
 
 	config.Image = envOr("ENV_IMAGE", buildImage)
 

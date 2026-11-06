@@ -296,8 +296,8 @@ blob, authorization code or ID token.
 | `ENCRYPTION_KEY_VERSION` | `1` | Integer **1–255** — it is stored as a single byte prefixed to every sealed value, which is the hook for key rotation |
 | `SESSION_TTL` | `12h` | Absolute lifetime (default 12h) |
 | `SESSION_IDLE_TTL` | `30m` | Idle window, must not exceed `SESSION_TTL` |
-| `BASE_URL` | `http://localhost:9999` | Public API origin |
-| `FRONTEND_URL` | `http://localhost:5173` | Redirect target and the only CORS origin |
+| `BASE_URL` | `http://localhost:9200` | Public API origin |
+| `FRONTEND_URL` | `http://localhost:5174` | Redirect target and the only CORS origin |
 
 `config.Load()` fails fast if the OAuth client id/secret, the redirect URL or `ENCRYPTION_KEY` is
 missing, rather than 302-ing to Google with an empty client id. `NewBox` then rejects a key of the
