@@ -9,12 +9,34 @@ BEGIN;
 -- League structure
 -- -----------------------------------------------------------------------------
 
+-- Identity, written only by the Google login upsert in internal/auth/repositories.go.
+-- id is TEXT holding a uuid_generate_v4() value, so auth.User.ID and auth.Session.UserID
+-- are Go strings. Every FK into this table is therefore TEXT too — a BIGINT one cannot be
+-- created at all ("incompatible types: bigint and text").
 CREATE TABLE users (
-	id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-	display_name  TEXT,
-	created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-	updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+	id              TEXT        PRIMARY KEY DEFAULT uuid_generate_v4(),
+	google_sub      TEXT        NOT NULL UNIQUE,  -- the ON CONFLICT target of the login upsert
+	email           TEXT        NOT NULL,
+	email_verified  BOOLEAN     NOT NULL DEFAULT false,
+	name            TEXT        NOT NULL,
+	avatar_url      TEXT        NOT NULL DEFAULT '',
+	hd              TEXT,                         -- Google Workspace domain, absent for consumer accounts
+	created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+	last_login_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Server-side sessions; the id is the value of the HttpOnly `sid` cookie. The repository
+-- expires rows by both absolute age (created_at) and idleness (last_seen_at), so neither
+-- column is decorative.
+CREATE TABLE sessions (
+	id            TEXT        PRIMARY KEY DEFAULT uuid_generate_v4(),
+	user_id       TEXT        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+	last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Logout-everywhere and the expiry sweep both filter by user_id.
+CREATE INDEX sessions_user_id_idx ON sessions (user_id);
 
 CREATE TABLE seasons (
 	id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -49,7 +71,7 @@ CREATE TABLE venues (
 CREATE TABLE players (
 	id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
 	-- NULL until they sign in; most players never do.
-	user_id      UUID        UNIQUE REFERENCES users (id) ON DELETE SET NULL,
+	user_id      TEXT        UNIQUE REFERENCES users (id) ON DELETE SET NULL,
 	member_id    TEXT        NOT NULL UNIQUE,         -- '95007620'
 	full_name    TEXT        NOT NULL,
 	skill_level  SMALLINT    NOT NULL DEFAULT 3 CHECK (skill_level BETWEEN 2 AND 7),
@@ -77,7 +99,7 @@ CREATE TABLE skill_level_history (
 	old_skill_level  SMALLINT    NOT NULL,
 	new_skill_level  SMALLINT    NOT NULL CHECK (new_skill_level BETWEEN 2 AND 7),
 	reason           TEXT,
-	changed_by       UUID        REFERENCES users (id),
+	changed_by       TEXT        REFERENCES users (id),
 	changed_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -122,7 +144,7 @@ CREATE TABLE team_matches (
 	status        VARCHAR(20) NOT NULL DEFAULT 'scheduled',
 	home_points   SMALLINT    NOT NULL DEFAULT 0,  -- kept in sync by trigger
 	away_points   SMALLINT    NOT NULL DEFAULT 0,
-	submitted_by  UUID        REFERENCES users (id),
+	submitted_by  TEXT        REFERENCES users (id),
 	submitted_at  TIMESTAMPTZ,
 	created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -153,8 +175,9 @@ CREATE TABLE individual_matches (
 	away_def_shots    SMALLINT    NOT NULL DEFAULT 0 CHECK (away_def_shots >= 0),
 	home_points       SMALLINT    NOT NULL DEFAULT 0,
 	away_points       SMALLINT    NOT NULL DEFAULT 0,
-	status            TEXT        NOT NULL DEFAULT 'pending',
-	entered_by        UUID        REFERENCES users (id),
+	status            TEXT        NOT NULL DEFAULT 'pending'
+		CHECK (status IN ('pending', 'complete')),
+	entered_by        TEXT        REFERENCES users (id),
 	updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
 
 	UNIQUE (team_match_id, match_order)
@@ -239,9 +262,9 @@ CREATE TABLE roles_permissions (
 );
 
 CREATE TABLE users_roles (
-	user_id     UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	user_id     TEXT        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
 	role_id     UUID        NOT NULL REFERENCES roles (id) ON DELETE CASCADE,
-	granted_by  UUID        REFERENCES users (id),  -- who assigned it, for audits
+	granted_by  TEXT        REFERENCES users (id),  -- who assigned it, for audits
 	created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
 
 	PRIMARY KEY (user_id, role_id)

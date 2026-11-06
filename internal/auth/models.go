@@ -5,7 +5,7 @@ import "time"
 // User mirrors the users table, minus google_sub and hd: nothing in Go reads
 // them back.
 type User struct {
-	ID            int64     `db:"id"`
+	ID            string    `db:"id"`
 	Email         string    `db:"email"`
 	EmailVerified bool      `db:"email_verified"`
 	Name          string    `db:"name"`
@@ -28,7 +28,7 @@ type GoogleIdentityParams struct {
 // Session is a server-side login. The id is the cookie value.
 type Session struct {
 	ID         string    `db:"id"`
-	UserID     int64     `db:"user_id"`
+	UserID     string    `db:"user_id"`
 	CreatedAt  time.Time `db:"created_at"`
 	LastSeenAt time.Time `db:"last_seen_at"`
 }

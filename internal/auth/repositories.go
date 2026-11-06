@@ -19,7 +19,7 @@ const userColumns = "id, email, email_verified, name, avatar_url, created_at, la
 
 type Repository interface {
 	UpsertGoogleIdentity(ctx context.Context, p GoogleIdentityParams) (*User, bool, error)
-	GetUserByID(ctx context.Context, id int64) (*User, error)
+	GetUserByID(ctx context.Context, id string) (*User, error)
 
 	CreateSession(ctx context.Context, s Session) error
 	// GetSession returns a session only if it is within both TTLs. The cutoffs
@@ -27,7 +27,7 @@ type Repository interface {
 	GetSession(ctx context.Context, id string, absoluteCutoff, idleCutoff time.Time) (*Session, error)
 	UpdateSessionLastSeenAt(ctx context.Context, id string) error
 	DeleteSession(ctx context.Context, id string) error
-	DeleteUserSessions(ctx context.Context, userID int64) error
+	DeleteUserSessions(ctx context.Context, userID string) error
 	DeleteExpiredSessions(ctx context.Context, absoluteCutoff, idleCutoff time.Time) (int64, error)
 }
 
@@ -66,7 +66,7 @@ RETURNING ` + userColumns + `, (xmax = 0) AS is_new_user`
 	return &u, isNewUser, nil
 }
 
-func (r *repository) GetUserByID(ctx context.Context, id int64) (*User, error) {
+func (r *repository) GetUserByID(ctx context.Context, id string) (*User, error) {
 	const query = `SELECT ` + userColumns + ` FROM users WHERE id = $1`
 
 	user, err := queryOne[User](ctx, r.pgPool, query, id)
@@ -122,7 +122,7 @@ func (r *repository) DeleteSession(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *repository) DeleteUserSessions(ctx context.Context, userID int64) error {
+func (r *repository) DeleteUserSessions(ctx context.Context, userID string) error {
 	const query = `DELETE FROM sessions WHERE user_id = $1`
 
 	if _, err := r.pgPool.Exec(ctx, query, userID); err != nil {
