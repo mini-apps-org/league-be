@@ -68,7 +68,7 @@ func (h *Handler) CallbackLogin(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	oauthTx := h.readCookie(r, oauthTxCookie)
-	h.clearCookie(w, oauthTxCookie, OAuthTxCookiePath)
+	h.clearCookie(w, oauthTxCookie)
 
 	if reason := q.Get("error"); reason != "" {
 		h.failLogin(w, r, reasonCancelled, errors.New("google: "+reason))
@@ -147,8 +147,8 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.clearCookie(w, sessionCookie, "/")
-	h.clearCookie(w, csrfCookie, "/")
+	h.clearCookie(w, sessionCookie)
+	h.clearCookie(w, csrfCookie)
 	h.noStore(w)
 	h.ReturnWithJSON(w, http.StatusNoContent, nil)
 }

@@ -25,7 +25,7 @@ func (h *Handler) RequireAuth(next http.Handler) http.Handler {
 
 		user, err := h.service.SessionUser(r.Context(), sessionID)
 		if err != nil {
-			h.clearCookie(w, sessionCookie, "/")
+			h.clearCookie(w, sessionCookie)
 			h.ReturnWithError(w, r, handler.Error(handler.CodeSessionInvalid, err))
 			return
 		}
