@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -58,6 +59,7 @@ func cookieNameFor(cfg *config.Config, base string) string {
 // Domain is the frontend's host, so the SPA can read the csrf token even though
 // the API set it. That also means every subdomain of it can read these cookies.
 func (h *Handler) setCookie(w http.ResponseWriter, name, value string, ttl time.Duration, httpOnly bool) {
+	fmt.Println(h.Config.CookieDomain(), cookiePath(name), "h.Config.CookieDomain(), cookiePath(name)")
 	http.SetCookie(w, &http.Cookie{
 		Name:     h.cookieName(name),
 		Value:    value,
