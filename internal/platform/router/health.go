@@ -9,7 +9,7 @@ import (
 )
 
 func (r *Router) registerHealthRoute(api *mux.Router) {
-	api.HandleFunc("/", r.healthCheck).Methods(http.MethodGet)
+	api.HandleFunc("", r.healthCheck).Methods(http.MethodGet)
 	api.HandleFunc("/health", r.healthCheck).Methods(http.MethodGet)
 }
 
