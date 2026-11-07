@@ -9,10 +9,9 @@ import (
 )
 
 type Config struct {
-	Env         string
-	Image       string
-	BaseURL     string
-	FrontendURL string
+	Env     string
+	Image   string
+	BaseURL string
 
 	Logger struct {
 		Level       string `mapstructure:"level"`
@@ -60,6 +59,9 @@ type Config struct {
 		EncryptionKey        string
 		EncryptionKeyVersion int
 	} `mapstructure:"auth"`
+	AppBaseURL struct {
+		Frontend string
+	} `mapstructure:"app_base_url"`
 }
 
 // CookieDomain is the Domain attribute for every cookie: the frontend's host, so
@@ -72,7 +74,8 @@ func (c *Config) CookieDomain() string {
 	if !c.IsProduction() {
 		return ""
 	}
-	u, err := url.Parse(c.FrontendURL)
+	u, err := url.Parse(c.AppBaseURL.Frontend)
+	fmt.Println(c.AppBaseURL.Frontend, "CookieDomain...")
 	if err != nil {
 		return ""
 	}

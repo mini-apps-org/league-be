@@ -104,7 +104,7 @@ func (h *Handler) CallbackLogin(w http.ResponseWriter, r *http.Request) {
 	h.setCSRFCookie(w, csrfToken)
 	h.noStore(w)
 
-	target := h.Config.FrontendURL
+	target := h.Config.AppBaseURL.Frontend
 	if login.IsNewUser {
 		target += "/onboarding"
 	}
@@ -157,7 +157,7 @@ func (h *Handler) failLogin(w http.ResponseWriter, r *http.Request, reason login
 	log.Printf("auth: login failed (%s): %v", reason, cause)
 
 	h.noStore(w)
-	target := h.Config.FrontendURL + "/login?" + url.Values{"error": {string(reason)}}.Encode()
+	target := h.Config.AppBaseURL.Frontend + "/login?" + url.Values{"error": {string(reason)}}.Encode()
 	http.Redirect(w, r, target, http.StatusFound)
 }
 

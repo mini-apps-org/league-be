@@ -53,7 +53,7 @@ func main() {
 	// Exactly one allowed origin, with credentials: the session lives in a
 	// cookie, which the browser sends cross-origin only when both are set.
 	corsHandler := cors.New(cors.Options{
-		AllowedOrigins:   []string{cfg.FrontendURL},
+		AllowedOrigins:   []string{cfg.AppBaseURL.Frontend},
 		AllowedHeaders:   config.AllowHeadersAPI,
 		AllowCredentials: true,
 		AllowedMethods: []string{
