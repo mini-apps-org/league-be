@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os/signal"
@@ -74,6 +75,8 @@ func main() {
 		WriteTimeout:      90 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
+
+	fmt.Println("[DEBUG]-image", cfg.Image)
 
 	go func() {
 		log.Printf("listening on %s (env=%s image=%s)", cfg.ServerPort(), cfg.Env, cfg.Image)
