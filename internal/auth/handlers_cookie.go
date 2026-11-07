@@ -63,7 +63,7 @@ func (h *Handler) setCookie(w http.ResponseWriter, name, value string, ttl time.
 	http.SetCookie(w, &http.Cookie{
 		Name:     h.cookieName(name),
 		Value:    value,
-		Path:     cookiePath(name),
+		Path:     "/",
 		Domain:   h.Config.CookieDomain(),
 		MaxAge:   int(ttl.Seconds()),
 		HttpOnly: httpOnly,
