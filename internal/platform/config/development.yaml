@@ -24,6 +24,9 @@ database:
 auth:
   google_oauth_redirect_url: http://localhost:9200/api/v1/auth/google/callback
 
+app_base_url:
+  frontend: http://localhost:5174
+
 domains:
   allowed_origins:
     - http://localhost:*

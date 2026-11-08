@@ -9,10 +9,9 @@ import (
 )
 
 type Config struct {
-	Env         string
-	Image       string
-	BaseURL     string
-	FrontendURL string
+	Env     string
+	Image   string
+	BaseURL string
 
 	Logger struct {
 		Level       string `mapstructure:"level"`
@@ -60,6 +59,26 @@ type Config struct {
 		EncryptionKey        string
 		EncryptionKeyVersion int
 	} `mapstructure:"auth"`
+	AppBaseURL struct {
+		Frontend string
+	} `mapstructure:"app_base_url"`
+}
+
+// CookieDomain is the Domain attribute for every cookie: the frontend's host, so
+// the SPA on mvip-league.com can read them even though be.mvip-league.com set
+// them. Being a parent domain, it also covers the API host.
+//
+// Empty outside production, where FRONTEND_URL is http://localhost: a browser
+// will not accept Domain=localhost.
+func (c *Config) CookieDomain() string {
+	if !c.IsProduction() {
+		return ""
+	}
+	u, err := url.Parse(c.AppBaseURL.Frontend)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
 }
 
 func (c *Config) IsProduction() bool {
