@@ -26,17 +26,38 @@ func (h *Handler) secure() bool {
 	return h.Config.IsProduction()
 }
 
-// cookieName adds the __Host- prefix in production, so no subdomain can
-// overwrite the cookie.
+// cookieName prefixes the cookie in production, so no subdomain can overwrite it.
 func (h *Handler) cookieName(base string) string {
 	return cookieNameFor(h.Config, base)
 }
 
+// cookieNameFor picks the strongest prefix each cookie actually qualifies for.
+// The browser silently DISCARDS a cookie whose attributes do not back its
+// prefix (RFC 6265bis 4.1.3), so this cannot be a single hardcoded string:
+//
+//	__Host-    needs Secure, no Domain, and Path exactly "/"
+//	__Secure-  needs Secure only — any Path is fine
+//
+// oauth_tx is deliberately scoped to OAuthTxCookiePath, so it can never satisfy
+// __Host-. Naming it __Host- means the browser stores nothing and the callback
+// fails with "no oauth_tx cookie" — login is impossible, with no server error.
 func cookieNameFor(cfg *config.Config, base string) string {
-	if cfg.IsProduction() {
-		return "__Host-" + base
+	if !cfg.IsProduction() {
+		return base
 	}
-	return base
+	if cookiePathFor(base) != "/" {
+		return "__Secure-" + base
+	}
+	return "__Host-" + base
+}
+
+// cookiePathFor is the Path each cookie is set with. The prefix decision reads
+// it too, so the two can never drift apart.
+func cookiePathFor(base string) string {
+	if base == oauthTxCookie {
+		return OAuthTxCookiePath
+	}
+	return "/"
 }
 
 // setCookie is the only place cookie attributes are chosen. ttl becomes Max-Age,
