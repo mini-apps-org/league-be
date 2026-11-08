@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 type Config struct {
@@ -78,7 +80,19 @@ func (c *Config) CookieDomain() string {
 	if err != nil {
 		return ""
 	}
-	return u.Hostname()
+
+	// The registrable domain, not the host. The API at be.mvip-league.com is the
+	// one setting the cookie, and a browser rejects a Domain its own host does
+	// not domain-match — be. and www. are siblings, so Domain=www.mvip-league.com
+	// is discarded outright. Only the shared parent mvip-league.com covers both.
+	//
+	// publicsuffix is what makes this safe: stripping a label by hand would turn
+	// example.co.uk into co.uk, a public suffix no cookie may be scoped to.
+	parent, err := publicsuffix.EffectiveTLDPlusOne(u.Hostname())
+	if err != nil {
+		return ""
+	}
+	return parent
 }
 
 func (c *Config) IsProduction() bool {
