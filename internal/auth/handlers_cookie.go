@@ -11,24 +11,26 @@ const (
 	sessionCookie = "sid"      // server-side session id
 	oauthTxCookie = "oauth_tx" // binds a login transaction to this browser
 	csrfCookie    = "csrf"     // double-submit token; readable by JS on purpose
-)
 
-// OAuthTxCookiePath scopes the oauth_tx cookie so nothing outside the Google
-// login routes can read it. It MUST stay a prefix of the mounted callback path:
-// the browser withholds the cookie on a path mismatch, and the callback then
-// fails with "no oauth_tx cookie" — a silent, total login outage with no
-// compile error. Asserted against the router in TestOAuthTxCookiePathCoversRoutes.
-const OAuthTxCookiePath = "/api/v1/auth/google"
+	// OAuthTxCookiePath scopes the oauth_tx cookie so nothing outside the Google
+	// login routes can read it. It MUST stay a prefix of the mounted callback path:
+	// the browser withholds the cookie on a path mismatch, and the callback then
+	// fails with "no oauth_tx cookie" — a silent, total login outage with no
+	// compile error. Asserted against the router in TestOAuthTxCookiePathCoversRoutes.
+	OAuthTxCookiePath = "/api/v1/auth/google"
+
+	defautlCookePath = "/"
+)
 
 // secure keeps the Secure attribute and the __Host- prefix it requires in one
 // place, so the two cannot disagree.
-func (h *Handler) secure() bool {
+func (h *Handler) isSecure() bool {
 	return h.Config.IsProduction()
 }
 
 // cookieName prefixes the cookie in production, so no subdomain can overwrite it.
-func (h *Handler) cookieName(base string) string {
-	return cookieNameFor(h.Config, base)
+func (h *Handler) getCookieName(cookieName string) string {
+	return getCookieNameWithCookiePrefixed(h.Config, cookieName)
 }
 
 // cookieNameFor picks the strongest prefix each cookie actually qualifies for.
@@ -41,27 +43,28 @@ func (h *Handler) cookieName(base string) string {
 // oauth_tx is scoped to OAuthTxCookiePath and csrf carries a Domain, so neither
 // can satisfy __Host-. Naming one __Host- anyway means the browser stores
 // nothing: login fails with "no oauth_tx cookie", writes fail with 40302.
-func cookieNameFor(cfg *config.Config, base string) string {
+func getCookieNameWithCookiePrefixed(cfg *config.Config, cookieName string) string {
 	if !cfg.IsProduction() {
-		return base
+		return cookieName
 	}
-	if cookiePathFor(base) != "/" || cookieDomainFor(cfg, base) != "" {
-		return "__Secure-" + base
+	// if h.getCookiePathByCookieName(cookieName) != "/" || h.getCookieDomainByCookieName(cookieName) != "" {
+	if getCookiePathByCookieName(cookieName) != "/" {
+		return "__Secure-" + cookieName
 	}
-	return "__Host-" + base
+	return "__Host-" + cookieName
 }
 
 // cookiePathFor is the Path each cookie is set with. The prefix decision reads
 // it too, so the two can never drift apart.
-func cookiePathFor(base string) string {
-	if base == oauthTxCookie {
+func getCookiePathByCookieName(cookieName string) string {
+	if cookieName == oauthTxCookie {
 		return OAuthTxCookiePath
 	}
 	return "/"
 }
 
-func cookieDomainFor(cfg *config.Config, base string) string {
-	if base == csrfCookie {
+func getCookieDomainByCookieName(cfg *config.Config, cookieName string) string {
+	if cookieName == csrfCookie {
 		return cfg.CookieDomain()
 	}
 	return ""
@@ -70,25 +73,30 @@ func cookieDomainFor(cfg *config.Config, base string) string {
 // setCookie is the only place cookie attributes are chosen. ttl becomes Max-Age,
 // not Expires, so a skewed client clock cannot mis-expire the cookie. SameSite is
 // Lax, not Strict: Google's redirect back is a cross-site top-level navigation.
-func (h *Handler) setCookie(w http.ResponseWriter, name, value, path string, ttl time.Duration, httpOnly bool) {
+func (h *Handler) setCookie(w http.ResponseWriter, params CookieParams) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     h.cookieName(name),
-		Value:    value,
-		Path:     path,
-		Domain:   cookieDomainFor(h.Config, name),
-		MaxAge:   int(ttl.Seconds()),
-		HttpOnly: httpOnly,
-		Secure:   h.secure(),
+		Name:     h.getCookieName(params.name),
+		Value:    params.value,
+		Path:     params.path,
+		Domain:   getCookieDomainByCookieName(h.Config, params.name),
+		MaxAge:   int(params.ttl.Seconds()),
+		HttpOnly: params.httpOnly,
+		Secure:   h.isSecure(),
 		SameSite: http.SameSiteLaxMode,
 	})
 }
 
 func (h *Handler) clearCookie(w http.ResponseWriter, name, path string) {
-	h.setCookie(w, name, "", path, -time.Second, true) // MaxAge < 0 deletes it
+	h.setCookie(w, CookieParams{
+		name:     name,
+		path:     path,
+		ttl:      -time.Second,
+		httpOnly: true,
+	})
 }
 
 func (h *Handler) readCookie(r *http.Request, name string) string {
-	c, err := r.Cookie(h.cookieName(name))
+	c, err := r.Cookie(h.getCookieName(name))
 	if err != nil {
 		return ""
 	}
@@ -98,23 +106,41 @@ func (h *Handler) readCookie(r *http.Request, name string) string {
 // setSessionCookie keeps the id HttpOnly: no script reads it, so XSS cannot
 // steal it the way it could from localStorage.
 func (h *Handler) setSessionCookie(w http.ResponseWriter, sessionID string) {
-	h.setCookie(w, sessionCookie, sessionID, "/", h.Config.Auth.SessionTTL, true)
+	h.setCookie(w, CookieParams{
+		name:     sessionCookie,
+		value:    sessionID,
+		path:     defautlCookePath,
+		ttl:      h.Config.Auth.SessionTTL,
+		httpOnly: true,
+	})
 }
 
 // setCSRFCookie is intentionally not HttpOnly: the SPA must read it to echo it
 // back in a header. It is not a credential, only proof of same-origin access.
 func (h *Handler) setCSRFCookie(w http.ResponseWriter, token string) {
-	h.setCookie(w, csrfCookie, token, "/", h.Config.Auth.SessionTTL, false)
+	h.setCookie(w, CookieParams{
+		name:     csrfCookie,
+		value:    token,
+		path:     defautlCookePath,
+		ttl:      h.Config.Auth.SessionTTL,
+		httpOnly: false,
+	})
 }
 
 // setOAuthTxCookie carries the sealed login transaction, scoped to the callback
 // path and expiring with the transaction so nothing else can reach it.
 func (h *Handler) setOAuthTxCookie(w http.ResponseWriter, sealed string) {
-	h.setCookie(w, oauthTxCookie, sealed, OAuthTxCookiePath, loginTxTTL, true)
+	h.setCookie(w, CookieParams{
+		name:     oauthTxCookie,
+		value:    sealed,
+		path:     OAuthTxCookiePath,
+		ttl:      loginTxTTL,
+		httpOnly: true,
+	})
 }
 
 // CSRFCookieName is the resolved name the CSRF middleware must read. It takes
 // config because the router wires middleware before any Handler exists.
 func CSRFCookieName(cfg *config.Config) string {
-	return cookieNameFor(cfg, csrfCookie)
+	return getCookieNameWithCookiePrefixed(cfg, csrfCookie)
 }
