@@ -27,7 +27,7 @@ auth:
   google_oauth_redirect_url: https://be.mvip-league.com/api/v1/auth/google/callback
 
 app_base_url:
-  frontend: https://www.mvip-league.com
+  frontend: https://mvip-league.com
 
 domains:
   allowed_origins:

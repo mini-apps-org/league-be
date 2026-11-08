@@ -1,5 +1,7 @@
 package auth
 
+import "time"
+
 // UserResponse is the API `User` shape: camelCase, no identity subject or
 // timestamps.
 type UserResponse struct {
@@ -22,4 +24,12 @@ func newUserResponse(u *User) UserResponse {
 		Name:      u.Name,
 		AvatarURL: u.AvatarURL,
 	}
+}
+
+type CookieParams struct {
+	name     string
+	value    string
+	path     string
+	ttl      time.Duration
+	httpOnly bool
 }
