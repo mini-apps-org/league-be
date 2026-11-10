@@ -22,8 +22,6 @@ type Repository interface {
 	GetUserByID(ctx context.Context, id string) (*User, error)
 
 	CreateSession(ctx context.Context, s Session) error
-	// GetSession returns a session only if it is within both TTLs. The cutoffs
-	// are passed in so the SQL decides what is still alive.
 	GetSession(ctx context.Context, id string, absoluteCutoff, idleCutoff time.Time) (*Session, error)
 	UpdateSessionLastSeenAt(ctx context.Context, id string) error
 	DeleteSession(ctx context.Context, id string) error
@@ -98,7 +96,7 @@ func (r *repository) GetUserByID(ctx context.Context, id string) (*User, error) 
 }
 
 func (r *repository) CreateSession(ctx context.Context, s Session) error {
-	const query = `INSERT INTO sessions (id, user_id) VALUES ($1, $2)`
+	const query = `INSERT INTO users_sessions (id, user_id) VALUES ($1, $2)`
 	args := []any{
 		s.ID,     // $1 id
 		s.UserID, // $2 user_id
@@ -113,7 +111,7 @@ func (r *repository) CreateSession(ctx context.Context, s Session) error {
 func (r *repository) GetSession(ctx context.Context, id string, absoluteCutoff, idleCutoff time.Time) (*Session, error) {
 	const query = `
 SELECT id, user_id, created_at, last_seen_at
-FROM sessions
+FROM users_sessions
 WHERE id = $1 AND created_at > $2 AND last_seen_at > $3`
 	args := []any{
 		id,             // $1 id
@@ -132,7 +130,7 @@ WHERE id = $1 AND created_at > $2 AND last_seen_at > $3`
 }
 
 func (r *repository) UpdateSessionLastSeenAt(ctx context.Context, id string) error {
-	const query = `UPDATE sessions SET last_seen_at = now() WHERE id = $1`
+	const query = `UPDATE users_sessions SET last_seen_at = now() WHERE id = $1`
 	args := []any{
 		id,
 	}
@@ -144,7 +142,7 @@ func (r *repository) UpdateSessionLastSeenAt(ctx context.Context, id string) err
 }
 
 func (r *repository) DeleteSession(ctx context.Context, id string) error {
-	const query = `DELETE FROM sessions WHERE id = $1`
+	const query = `DELETE FROM users_sessions WHERE id = $1`
 	args := []any{
 		id,
 	}
@@ -156,7 +154,7 @@ func (r *repository) DeleteSession(ctx context.Context, id string) error {
 }
 
 func (r *repository) DeleteUserSessions(ctx context.Context, userID string) error {
-	const query = `DELETE FROM sessions WHERE user_id = $1`
+	const query = `DELETE FROM users_sessions WHERE user_id = $1`
 	args := []any{
 		userID,
 	}
@@ -168,7 +166,7 @@ func (r *repository) DeleteUserSessions(ctx context.Context, userID string) erro
 }
 
 func (r *repository) DeleteExpiredSessions(ctx context.Context, absoluteCutoff, idleCutoff time.Time) (int64, error) {
-	const query = `DELETE FROM sessions WHERE created_at <= $1 OR last_seen_at <= $2`
+	const query = `DELETE FROM users_sessions WHERE created_at <= $1 OR last_seen_at <= $2`
 	args := []any{
 		absoluteCutoff, // $1 created_at ceiling
 		idleCutoff,     // $2 last_seen_at ceiling
