@@ -61,6 +61,9 @@ type Config struct {
 		EncryptionKey        string
 		EncryptionKeyVersion int
 	} `mapstructure:"auth"`
+	Domains struct {
+		AllowedOrigins []string `mapstructure:"allowed_origins"`
+	} `mapstructure:"domains"`
 	AppBaseURL struct {
 		Frontend string
 	} `mapstructure:"app_base_url"`

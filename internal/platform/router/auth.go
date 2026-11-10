@@ -23,10 +23,10 @@ func (r *Router) registerAuthRoute(ctx context.Context, api *mux.Router) error {
 
 	authRepo := auth.NewRepo(r.Pool)
 
-	authService := auth.NewService(googleAuth, authRepo, sealer, r.Config.Auth.SessionTTL, r.Config.Auth.SessionIdleTTL)
+	authService := auth.NewService(r.Config, googleAuth, authRepo, sealer)
 	authHandler := auth.NewHandler(r.Config, authService)
 
-	auth.StartSessionCleanup(ctx, authRepo, r.Config.Auth.SessionTTL, r.Config.Auth.SessionIdleTTL)
+	authService.StartSessionCleanup(ctx)
 
 	authRouter := api.PathPrefix("/auth/google").Subrouter()
 	authRouter.HandleFunc("/login", authHandler.Login).Methods(http.MethodGet)

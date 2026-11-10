@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/nguyentanvinh/league-be/internal/common"
 	"github.com/nguyentanvinh/league-be/internal/platform/config"
 	"github.com/nguyentanvinh/league-be/internal/platform/handler"
 )
@@ -94,7 +95,7 @@ func (h *Handler) CallbackLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	csrfToken, err := randomToken()
+	csrfToken, err := common.RandomToken()
 	if err != nil {
 		h.failLogin(w, r, reasonServerError, err)
 		return

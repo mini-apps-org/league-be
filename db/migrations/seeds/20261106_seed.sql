@@ -1,31 +1,39 @@
 -- Development seed. Applied by `make seed`, not part of the schema.
 --
--- Natural keys (season name, team number, member id) are used for every lookup so the file
--- never depends on generated uuids and can be re-read top to bottom.
+-- Natural keys (league name, session name, team number, member id) are used for every lookup
+-- so the file never depends on generated uuids and can be re-read top to bottom.
 
 BEGIN;
 
 
-INSERT INTO seasons (name, starts_on, ends_on, is_active)
-VALUES ('Fall 2026', '2026-09-01', '2026-12-20', true);
+INSERT INTO leagues (name, description, location, contact_email, timezone)
+VALUES ('MVIP League', 'Development league', 'Ho Chi Minh City', 'ops@mvip-league.com', 'Asia/Ho_Chi_Minh');
+
+-- Fall 2026 runs Sep -> Dec, so season_year and the dates agree here; a session that
+-- crossed into January would still carry season_year 2026.
+INSERT INTO league_sessions (league_id, name, session_type, season_year, starts_on, ends_on, is_active)
+SELECT l.id, 'Fall 2026', 'FALL', 2026, '2026-09-01', '2026-12-20', true
+FROM leagues l WHERE l.name = 'MVIP League';
 
 INSERT INTO divisions (season_id, name, format, skill_level_cap)
 SELECT s.id, '8-Ball Open', '8-ball', 23
-FROM seasons s WHERE s.name = 'Fall 2026';
+FROM league_sessions s WHERE s.name = 'Fall 2026';
 
-INSERT INTO venues (name, address)
-VALUES ('Saigon Cue Club', '12 Nguyen Hue, District 1, Ho Chi Minh City');
+INSERT INTO venues (league_id, name, address)
+SELECT l.id, 'Saigon Cue Club', '12 Nguyen Hue, District 1, Ho Chi Minh City'
+FROM leagues l WHERE l.name = 'MVIP League';
 
-INSERT INTO teams (division_id, team_number, name)
-SELECT d.id, t.team_number, t.name
+INSERT INTO teams (division_id, venue_id, team_number, name)
+SELECT d.id, v.id, t.team_number, t.name
 FROM divisions d
+CROSS JOIN venues v
 CROSS JOIN (VALUES
 	('03209', 'Corner Pocket Crew'),
 	('03214', 'Eight Ball Bandits'),
 	('03211', 'Rack Attack'),
 	('03207', 'Side Pocket Social')
 ) AS t (team_number, name)
-WHERE d.name = '8-Ball Open';
+WHERE d.name = '8-Ball Open' AND v.name = 'Saigon Cue Club';
 
 
 -- Skill levels are deliberately top-heavy on 03209 and 03211: their five strongest total
@@ -121,7 +129,7 @@ INSERT INTO users_roles (user_id, role_id)
 SELECT u.id, r.id
 FROM users u
 JOIN roles r ON (u.google_sub, r.code) IN (
-	('dev-admin-google-sub',   'ADMIN'),
+	('dev-admin-google-sub',   'SUPER_ADMIN'),
 	('dev-captain-google-sub', 'CAPTAIN')
 );
 

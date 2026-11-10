@@ -28,7 +28,8 @@ app_base_url:
   frontend: http://localhost:5174
 
 domains:
+  # Every origin here may make credentialed requests, so each entry can read an
+  # authenticated response. Keep the list to origins we actually serve the SPA from.
   allowed_origins:
     - http://localhost:*
     - https://localhost:*
-    - https://*.vercel.app
