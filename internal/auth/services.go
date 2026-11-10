@@ -2,14 +2,15 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/subtle"
-	"encoding/base64"
 	"fmt"
+	"log"
 	"time"
 
 	"golang.org/x/oauth2"
 
+	"github.com/nguyentanvinh/league-be/internal/common"
+	"github.com/nguyentanvinh/league-be/internal/platform/config"
 	"github.com/nguyentanvinh/league-be/internal/secret"
 )
 
@@ -21,26 +22,35 @@ type Service interface {
 	CompleteLogin(ctx context.Context, in CallbackInput) (LoginResult, error)
 	SessionUser(ctx context.Context, sessionID string) (*User, error)
 	Logout(ctx context.Context, sessionID string) error
+	StartSessionCleanup(ctx context.Context)
 }
 
 type service struct {
-	google IdentityProvider
-	repo   Repository
-	sealer *secret.Box
-	ttl    time.Duration
-	idle   time.Duration
+	config     *config.Config
+	google     IdentityProvider
+	repo       Repository
+	sealer     *secret.Box
+	sessionTTL time.Duration
+	idleTTL    time.Duration
 }
 
-func NewService(google IdentityProvider, repo Repository, sealer *secret.Box, sessionTTL, sessionIdleTTL time.Duration) Service {
-	return &service{google: google, repo: repo, sealer: sealer, ttl: sessionTTL, idle: sessionIdleTTL}
+func NewService(config *config.Config, google IdentityProvider, repo Repository, sealer *secret.Box) Service {
+	return &service{
+		google:     google,
+		repo:       repo,
+		config:     config,
+		sealer:     sealer,
+		sessionTTL: config.Auth.SessionTTL,
+		idleTTL:    config.Auth.SessionIdleTTL,
+	}
 }
 
 func (s *service) StartGoogleLogin(ctx context.Context) (LoginRedirect, error) {
-	state, err := randomToken()
+	state, err := common.RandomToken()
 	if err != nil {
 		return LoginRedirect{}, err
 	}
-	nonce, err := randomToken()
+	nonce, err := common.RandomToken()
 	if err != nil {
 		return LoginRedirect{}, err
 	}
@@ -99,7 +109,7 @@ func (s *service) CompleteLogin(ctx context.Context, in CallbackInput) (LoginRes
 
 	// A fresh id every login defeats session fixation, where an attacker plants
 	// a known session id before sign-in.
-	sessionID, err := randomToken()
+	sessionID, err := common.RandomToken()
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -114,7 +124,7 @@ func (s *service) CompleteLogin(ctx context.Context, in CallbackInput) (LoginRes
 func (s *service) SessionUser(ctx context.Context, sessionID string) (*User, error) {
 	now := time.Now()
 
-	session, err := s.repo.GetSession(ctx, sessionID, now.Add(-s.ttl), now.Add(-s.idle))
+	session, err := s.repo.GetSession(ctx, sessionID, now.Add(-s.sessionTTL), now.Add(-s.idleTTL))
 	if err != nil {
 		return nil, err
 	}
@@ -139,12 +149,31 @@ func (s *service) Logout(ctx context.Context, sessionID string) error {
 	return s.repo.DeleteSession(ctx, sessionID)
 }
 
-// randomToken mints a session id, state or nonce: 32 CSPRNG bytes, base64url so
-// it is safe in a cookie and a URL.
-func randomToken() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("auth: random token: %w", err)
+const cleanupInterval = 24 * time.Hour
+
+func (s *service) StartSessionCleanup(ctx context.Context) {
+	sweep := func() {
+		now := time.Now()
+		if deleted, err := s.repo.DeleteExpiredSessions(ctx, now.Add(-s.sessionTTL), now.Add(-s.idleTTL)); err != nil {
+			log.Printf("auth: session cleanup: %v", err)
+		} else if deleted > 0 {
+			log.Printf("auth: cleanup removed %d expired sessions", deleted)
+		}
 	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
+
+	go func() {
+		sweep()
+
+		ticker := time.NewTicker(cleanupInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				sweep()
+			}
+		}
+	}()
 }
