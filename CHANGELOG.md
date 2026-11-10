@@ -1,11 +1,11 @@
 # Changelog
 
-## [TBD](https://github.com/mini-apps-org/league-be/releases/tag/TBD) - 2026-11-10
-- [#XXX](https://github.com/mini-apps-org/league-be/pull/XXX)
-  - docs(auth): rewrite the README against the current code
+## [0.3.0](https://github.com/mini-apps-org/league-be/releases/tag/0.3.0) - 2026-11-10
+- [#PR2](https://github.com/mini-apps-org/league-be/pull/2)
+  - docs(auth): rewrite the `README` against the current code
   - fix(cors): drive allowed origins from config, and narrow them per environment
-  - refactor(auth): move the session sweep onto Service and share RandomToken
-  - feat(db): add leagues, operators and roster history, and rework the permission catalog
+  - refactor(auth): move the session sweep onto `Service` and share `RandomToken`
+  - feat(db): add `leagues`, `operators` and `roster history`, and rework the `permission` catalog
 
 ## [0.2.10](https://github.com/mini-apps-org/league-be/releases/tag/0.2.10) - 2026-11-08
 
