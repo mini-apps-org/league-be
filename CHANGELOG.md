@@ -1,5 +1,20 @@
 # Changelog
 
+## [TBD](https://github.com/mini-apps-org/league-be/releases/tag/0.2.10) - 2026-11-10
+
+- feat(db): add `leagues` as the root of the hierarchy, with `league_operators` scoping who may run which league
+- feat(db): add `team_rosters` as roster history, so a transfer preserves the match history it played in
+- feat(db): rename `seasons` to `league_sessions` with an explicit `session_type` and `season_year`
+- feat(db): rework the permission catalog into an `entity.action` matrix and rename `ADMIN` to `SUPER_ADMIN`
+- fix(db): rename `sessions` to `users_sessions` and point the auth queries at it
+- fix(db): grant the dev admin `SUPER_ADMIN` in the seed, which silently granted nothing after the rename
+- fix(db): restore the `>= 0` floors on `players_stats` counters and constrain `league_sessions.status`
+- fix(cors): name the allowed origins per environment, so production no longer accepts credentialed reads from `*.vercel.app` or plain-HTTP `localhost`
+- fix(config): refuse an empty `domains.allowed_origins` at startup instead of falling open to every origin
+- refactor(auth): move the session expiry sweep onto `Service` and share `RandomToken` via `internal/common`
+- chore(db): make the whole migration re-runnable with `IF NOT EXISTS` and `ON CONFLICT DO NOTHING`
+- docs(auth): rewrite `internal/auth/README.md` against the current code
+
 ## [0.2.10](https://github.com/mini-apps-org/league-be/releases/tag/0.2.10) - 2026-11-08
 
 - fix(auth): scope cookies to the registrable domain so the SPA on `www.` can read the `csrf` token
