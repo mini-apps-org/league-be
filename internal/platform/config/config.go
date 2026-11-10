@@ -92,6 +92,14 @@ func Load() (*Config, error) {
 		}
 	}
 
+	// rs/cors reads an empty AllowedOrigins as "every origin", which together
+	// with AllowCredentials would serve any site an authenticated response. A
+	// missing or misspelled domains.allowed_origins must stop the process, not
+	// fail open.
+	if len(config.Domains.AllowedOrigins) == 0 {
+		return nil, fmt.Errorf("config: domains.allowed_origins must list at least one origin")
+	}
+
 	return config, nil
 }
 

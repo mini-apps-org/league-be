@@ -30,10 +30,9 @@ app_base_url:
   frontend: https://www.mvip-league.com
 
 domains:
+  # Every origin here may make credentialed requests, so each entry can read an
+  # authenticated response. Name preview deployments explicitly — a wildcard such
+  # as https://*.vercel.app would let any site on that host read a signed-in
+  # user's data.
   allowed_origins:
-    - http://localhost:*
-    - https://localhost:*
-    - https://*.vercel.app
-  frontend_origins:
-    - http://localhost:*
-    - http://localhost:5174
+    - https://www.mvip-league.com
