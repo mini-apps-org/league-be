@@ -12,12 +12,17 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
+const (
+	PrefixAPIV1       = "/api/v1"
+	PathSwagger       = "/swagger"
+	PathSwaggerPrefix = "/swagger/"
+	PathSwaggerUI     = "/swagger/index.html"
+)
+
 type Router struct {
 	Config *config.Config
 	Pool   *pgxpool.Pool
 }
-
-const PrefixAPIV1 = "/api/v1"
 
 func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 	router := mux.NewRouter()
@@ -27,13 +32,7 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 		router.Use(middleware.HSTS)
 	}
 
-	router.HandleFunc("/swagger", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/swagger/index.html", http.StatusMovedPermanently)
-	}).Methods(http.MethodGet)
-
-	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
-		httpSwagger.URL("doc.json"),
-	)).Methods(http.MethodGet)
+	handleSwagger(router)
 
 	api := router.PathPrefix(PrefixAPIV1).Subrouter()
 
@@ -45,4 +44,14 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 	}
 
 	return router, nil
+}
+
+func handleSwagger(router *mux.Router) {
+	router.HandleFunc(PathSwagger, func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, PathSwaggerUI, http.StatusMovedPermanently)
+	}).Methods(http.MethodGet)
+
+	router.PathPrefix(PathSwaggerPrefix).Handler(httpSwagger.Handler(
+		httpSwagger.URL("doc.json"),
+	)).Methods(http.MethodGet)
 }
