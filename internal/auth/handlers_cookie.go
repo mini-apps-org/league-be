@@ -115,7 +115,7 @@ func (h *Handler) clearCookie(w http.ResponseWriter, name string) {
 	})
 }
 
-func (h *Handler) readCookie(r *http.Request, name string) string {
+func (h *Handler) getCookie(r *http.Request, name string) string {
 	c, err := r.Cookie(h.getCookieName(name))
 	if err != nil {
 		return ""
@@ -160,4 +160,14 @@ func (h *Handler) setOAuthTxCookie(w http.ResponseWriter, sealed string) {
 // config because the router wires middleware before any Handler exists.
 func CSRFCookieName(cfg *config.Config) string {
 	return getCookieNameWithCookiePrefixed(cfg, csrfCookie)
+}
+
+// GetSessionCookie and ClearSessionCookie are the session-cookie surface
+// middleware.Auth needs; sessionCookie itself stays unexported.
+func (h *Handler) GetSessionCookie(r *http.Request) string {
+	return h.getCookie(r, sessionCookie)
+}
+
+func (h *Handler) ClearSessionCookie(w http.ResponseWriter) {
+	h.clearCookie(w, sessionCookie)
 }

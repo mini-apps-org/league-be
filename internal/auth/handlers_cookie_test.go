@@ -135,7 +135,7 @@ func TestClearCookieMatchesSetCookie(t *testing.T) {
 	}
 }
 
-// readCookie has to look for the name setCookie wrote.
+// getCookie has to look for the name setCookie wrote.
 func TestCookieNameRoundTrips(t *testing.T) {
 	for _, env := range []string{"development", "production"} {
 		h := testHandler(env, "https://www.mvip-league.com")
@@ -146,8 +146,8 @@ func TestCookieNameRoundTrips(t *testing.T) {
 			for _, c := range w.Result().Cookies() {
 				r.AddCookie(c)
 			}
-			if got := h.readCookie(r, base); got != "VALUE" {
-				t.Errorf("%s/%s: readCookie returned %q", env, base, got)
+			if got := h.getCookie(r, base); got != "VALUE" {
+				t.Errorf("%s/%s: getCookie returned %q", env, base, got)
 			}
 		}
 	}

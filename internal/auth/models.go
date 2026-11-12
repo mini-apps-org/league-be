@@ -1,6 +1,9 @@
 package auth
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type User struct {
 	ID            string    `db:"id"`
@@ -10,6 +13,22 @@ type User struct {
 	AvatarURL     string    `db:"avatar_url"`
 	CreatedAt     time.Time `db:"created_at"`
 	LastLoginAt   time.Time `db:"last_login_at"`
+}
+
+// The authenticated user travels in the request context. The key and both
+// accessors live here, beside User, rather than with AuthenticationWithSession in
+// platform/middleware: Handler.Me reads the user back, so auth would have to
+// import middleware, which already imports auth — a cycle the compiler refuses.
+type userKey struct{}
+
+// WithUser is called by middleware.Auth.AuthenticationWithSession once a session resolves.
+func WithUser(ctx context.Context, user *User) context.Context {
+	return context.WithValue(ctx, userKey{}, user)
+}
+
+func ExtractUserFromContext(ctx context.Context) (*User, bool) {
+	user, ok := ctx.Value(userKey{}).(*User)
+	return user, ok
 }
 
 // GoogleIdentityParams carries ID token claims into the upsert. Every field

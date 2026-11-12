@@ -15,7 +15,6 @@ internal/<feature>/          one vertical slice, one package
   handlers.go                HTTP only: read the request, call the service, write the response
   services.go                business rules; `Service` is an interface, `service` the impl
   repositories.go            the only SQL; `Repository` is an interface
-  middleware.go              per-feature middleware (e.g. RequireAuth)
   models.go                  domain/db structs, `db:"col"` tags
   model_services.go          the service boundary types (inputs/results)
   model_handlers.go          the JSON wire types, camelCase `json:` tags
@@ -71,7 +70,7 @@ Retired codes (`40002`, `40303`) stay retired and are marked as such in the file
   `registerXRoute(ctx, api)`, and wired from `NewRouter`. The feature's constructors
   (`NewRepo` → `NewService` → `NewHandler`) are assembled there and nowhere else.
 - Mounting under `PrefixAPIV1` gives you CSRF on every unsafe method for free. Auth is
-  opt-in per route: `authHandler.RequireAuth(http.HandlerFunc(h.Me))`.
+  opt-in per route: `authHandler.AuthenticationWithSession(http.HandlerFunc(h.Me))`.
 - Every handler carries swagger annotations — `@Summary`, `@Tags`, `@Success`, one
   `@Failure` per code it can return, `@Security CSRFToken` on unsafe methods, `@Router`.
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/nguyentanvinh/league-be/internal/auth"
+	"github.com/nguyentanvinh/league-be/internal/platform/middleware"
 	"github.com/nguyentanvinh/league-be/internal/secret"
 )
 
@@ -33,8 +34,9 @@ func (r *Router) registerAuthRoute(ctx context.Context, api *mux.Router) error {
 	authRouter.HandleFunc("/callback", authHandler.CallbackLogin).Methods(http.MethodGet)
 
 	api.Handle("/auth/logout", http.HandlerFunc(authHandler.Logout)).Methods(http.MethodPost)
+	authMiddleware := middleware.NewAuthentication(r.Config, &authHandler)
 	api.Handle("/me",
-		authHandler.RequireAuth(http.HandlerFunc(authHandler.Me)),
+		authMiddleware.Require(http.HandlerFunc(authHandler.Me)),
 	).Methods(http.MethodGet)
 
 	return nil

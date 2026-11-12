@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -68,7 +69,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CallbackLogin(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
-	oauthTx := h.readCookie(r, oauthTxCookie)
+	oauthTx := h.getCookie(r, oauthTxCookie)
 	h.clearCookie(w, oauthTxCookie)
 
 	if reason := q.Get("error"); reason != "" {
@@ -121,7 +122,7 @@ func (h *Handler) CallbackLogin(w http.ResponseWriter, r *http.Request) {
 //	@Failure	401	{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID | 40103 USER_NOT_IN_CONTEXT"
 //	@Router		/me [get]
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
-	user, ok := UserFrom(r.Context())
+	user, ok := ExtractUserFromContext(r.Context())
 	if !ok {
 		h.ReturnWithError(w, r, handler.Error(handler.CodeNoUserInContext, errors.New("no user in context")))
 		return
@@ -143,7 +144,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 //	@Security		CSRFToken
 //	@Router			/auth/logout [post]
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.Logout(r.Context(), h.readCookie(r, sessionCookie)); err != nil {
+	if err := h.service.Logout(r.Context(), h.getCookie(r, sessionCookie)); err != nil {
 		h.ReturnWithError(w, r, handler.Error(handler.CodeInternal, err))
 		return
 	}
@@ -164,4 +165,10 @@ func (h *Handler) failLogin(w http.ResponseWriter, r *http.Request, reason login
 
 func (h *Handler) noStore(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-store")
+}
+
+// SessionUser lets middleware.Auth resolve a session without reaching past the
+// handler into the service.
+func (h *Handler) SessionUser(ctx context.Context, sessionID string) (*User, error) {
+	return h.service.SessionUser(ctx, sessionID)
 }
