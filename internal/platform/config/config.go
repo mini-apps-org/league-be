@@ -48,6 +48,7 @@ func Load() (*Config, error) {
 		config.Server.Port = strings.TrimPrefix(port, ":")
 	}
 
+	config.Logger.Level = envOr("LOG_LEVEL", config.Logger.Level)
 	config.Database.URL = os.Getenv("DATABASE_URL")
 	config.Database.Host = envOr("DB_HOST", "localhost")
 	if config.Database.Port, err = envIntOr("DB_PORT", 5432); err != nil {

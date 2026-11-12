@@ -3,8 +3,9 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/nguyentanvinh/league-be/internal/platform/config"
@@ -30,7 +31,7 @@ func (h *Handler) ReturnWithJSON(w http.ResponseWriter, statusCode int, v any) {
 
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		// The status is already on the wire, so logging is all that is left.
-		log.Printf("handler: encode %T: %v", v, err)
+		slog.Error("handler: encode response failed", "type", fmt.Sprintf("%T", v), "err", err)
 	}
 }
 

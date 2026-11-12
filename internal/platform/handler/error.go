@@ -3,7 +3,7 @@ package handler
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 )
@@ -157,12 +157,25 @@ func ErrorWithMessage(code ErrorCode, message string, cause error) *APIError {
 // an *APIError becomes 50001, so an unclassified failure cannot leak its text.
 func (h *Handler) ReturnWithError(w http.ResponseWriter, r *http.Request, err error) {
 	apiErr := AsAPIError(err)
+	status := apiErr.Status()
 
-	// Code, reason and cause only — never the user message or anything from the body.
-	log.Printf("%s %s -> %d %s %s: %v",
-		r.Method, r.URL.Path, apiErr.Status(), apiErr.Code, ReasonFor(apiErr.Code), apiErr.Err)
+	// Below 500 is the caller's mistake, not ours. A 404 or a missing CSRF token
+	// logged at error level makes a healthy service look like it is on fire.
+	level := slog.LevelError
+	if status < http.StatusInternalServerError {
+		level = slog.LevelWarn
+	}
 
-	h.ReturnWithJSON(w, apiErr.Status(), ErrorResponse{
+	slog.LogAttrs(r.Context(), level, "request failed",
+		slog.String("method", r.Method),
+		slog.String("path", r.URL.Path),
+		slog.Int("status", status),
+		slog.String("code", string(apiErr.Code)),
+		slog.String("reason", ReasonFor(apiErr.Code)),
+		slog.Any("err", apiErr.Err),
+	)
+
+	h.ReturnWithJSON(w, status, ErrorResponse{
 		Error: ErrorBody{Code: apiErr.Code, Message: apiErr.Message},
 	})
 }

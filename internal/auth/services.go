@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -155,9 +155,9 @@ func (s *service) StartSessionCleanup(ctx context.Context) {
 	sweep := func() {
 		now := time.Now()
 		if deleted, err := s.repo.DeleteExpiredSessions(ctx, now.Add(-s.sessionTTL), now.Add(-s.idleTTL)); err != nil {
-			log.Printf("auth: session cleanup: %v", err)
+			slog.Error("auth: session cleanup failed", "err", err)
 		} else if deleted > 0 {
-			log.Printf("auth: cleanup removed %d expired sessions", deleted)
+			slog.Info("auth: session cleanup swept", "deleted", deleted)
 		}
 	}
 

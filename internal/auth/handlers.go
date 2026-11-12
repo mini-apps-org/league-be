@@ -2,7 +2,7 @@ package auth
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 
@@ -155,7 +155,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) failLogin(w http.ResponseWriter, r *http.Request, reason loginErrorReason, cause error) {
-	log.Printf("auth: login failed (%s): %v", reason, cause)
+	slog.Warn("auth: login failed", "reason", reason, "err", cause)
 
 	h.noStore(w)
 	target := h.Config.AppBaseURL.Frontend + "/login?" + url.Values{"error": {string(reason)}}.Encode()

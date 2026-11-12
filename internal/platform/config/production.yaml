@@ -1,3 +1,6 @@
+logger:
+  level: info
+
 server:
   port: 5001
   graceful_shutdown_in_second: 5

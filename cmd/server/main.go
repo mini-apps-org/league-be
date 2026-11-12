@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -12,6 +13,7 @@ import (
 	_ "github.com/nguyentanvinh/league-be/docs/swagger"
 	"github.com/nguyentanvinh/league-be/internal/platform/config"
 	"github.com/nguyentanvinh/league-be/internal/platform/db"
+	"github.com/nguyentanvinh/league-be/internal/platform/logger"
 	"github.com/nguyentanvinh/league-be/internal/platform/router"
 	"github.com/rs/cors"
 )
@@ -33,20 +35,30 @@ func main() {
 	defer stop()
 
 	cfg, err := config.Load()
+
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		slog.Error("config: load failed", "err", err)
+		os.Exit(1)
+	}
+
+	configured, levelErr := logger.New(cfg.Env, cfg.Logger.Level)
+	slog.SetDefault(configured)
+	if levelErr != nil {
+		slog.Warn("logger: falling back to info", "err", levelErr)
 	}
 
 	pool, err := db.Connect(ctx, cfg)
 	if err != nil {
-		log.Fatalf("database: %v", err)
+		slog.Error("database: connect failed", "err", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
-	log.Printf("database connected (%s)", cfg.RedactedDatabaseTarget())
+	slog.Info("database: connected", "target", cfg.RedactedDatabaseTarget())
 
 	routes, err := (&router.Router{Config: cfg, Pool: pool}).NewRouter(ctx)
 	if err != nil {
-		log.Fatalf("router: %v", err)
+		slog.Error("router: build failed", "err", err)
+		os.Exit(1)
 	}
 
 	// Exactly one allowed origin, with credentials: the session lives in a
@@ -76,18 +88,19 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("listening on %s (env=%s image=%s)", cfg.ServerPort(), cfg.Env, cfg.Image)
+		slog.Info("server: listening", "addr", cfg.ServerPort(), "env", cfg.Env, "image", cfg.Image)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("server: %v", err)
+			slog.Error("server: listen failed", "err", err)
+			os.Exit(1)
 		}
 	}()
 
 	<-ctx.Done()
-	log.Print("shutting down")
+	slog.Info("server: shutting down")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Printf("shutdown: %v", err)
+		slog.Error("server: shutdown failed", "err", err)
 	}
 }

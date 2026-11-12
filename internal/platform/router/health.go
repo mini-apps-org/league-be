@@ -2,7 +2,7 @@ package router
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -31,6 +31,6 @@ type HealthResponse struct {
 func (r *Router) healthCheck(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if err := json.NewEncoder(w).Encode(HealthResponse{OK: true, Env: r.Config.Env, Image: r.Config.Image}); err != nil {
-		log.Printf("router: encode health: %v", err)
+		slog.Error("router: encode health failed", "err", err)
 	}
 }

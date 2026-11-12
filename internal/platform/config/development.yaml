@@ -1,3 +1,6 @@
+logger:
+  level: debug
+
 server:
   port: 9200
   graceful_shutdown_in_second: 5

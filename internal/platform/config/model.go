@@ -14,7 +14,9 @@ type Config struct {
 	Env     string
 	Image   string
 	BaseURL string
-
+	Logger  struct {
+		Level string `mapstructure:"level"`
+	} `mapstructure:"logger"`
 	Server struct {
 		Port                      string `mapstructure:"port"`
 		GracefulShutdownInSecond  int    `mapstructure:"graceful_shutdown_in_second"`
