@@ -1,5 +1,9 @@
 # Changelog
 
+## master - 2026-11-12
+
+- docs: add `pull_request_template`/`architecture`/`tips`/`workflow` for codebase
+
 ## [0.3.0](https://github.com/mini-apps-org/league-be/releases/tag/0.3.0) - 2026-11-10
 - [#PR2](https://github.com/mini-apps-org/league-be/pull/2)
   - docs(auth): rewrite the `README` against the current code
