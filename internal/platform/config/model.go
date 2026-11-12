@@ -15,14 +15,6 @@ type Config struct {
 	Image   string
 	BaseURL string
 
-	Logger struct {
-		Level       string `mapstructure:"level"`
-		PrettyPrint bool   `mapstructure:"pretty_print"`
-		FileName    string `mapstructure:"file_name"`
-		MaxSizeInMB int    `mapstructure:"max_size_in_mb"`
-		MaxBackUp   int    `mapstructure:"max_back_up"`
-		MaxAgeInDay int    `mapstructure:"max_age_in_day"`
-	} `mapstructure:"logger"`
 	Server struct {
 		Port                      string `mapstructure:"port"`
 		GracefulShutdownInSecond  int    `mapstructure:"graceful_shutdown_in_second"`

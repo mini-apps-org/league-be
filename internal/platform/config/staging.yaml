@@ -1,11 +1,3 @@
-logger:
-  level: debug
-  pretty_print: false
-  file_name: logs/logrus.log
-  max_size_in_mb: 50
-  max_back_up: 3
-  max_age_in_day: 30
-
 server:
   port: 5001
   graceful_shutdown_in_second: 5
