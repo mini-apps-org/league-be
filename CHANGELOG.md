@@ -2,6 +2,10 @@
 
 ## master - 2026-11-12
 
+- refactor(middleware): re-structure middleware and add `go vet` in ci/cd pipeline
+- refactor(router): extract `handleSwagger` and hoist route consts
+- feat(logger): setup logger for server
+- refactor(config): remove dead logrus config scaffolding
 - docs: add `pull_request_template`/`architecture`/`tips`/`workflow` for codebase
 
 ## [0.3.0](https://github.com/mini-apps-org/league-be/releases/tag/0.3.0) - 2026-11-10
