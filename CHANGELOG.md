@@ -1,6 +1,6 @@
 # Changelog
 
-## master - 2026-11-12
+## [0.4.0](https://github.com/mini-apps-org/league-be/releases/tag/0.4.0) - 2026-11-12
 
 - refactor(middleware): re-structure middleware and add `go vet` in ci/cd pipeline
 - refactor(router): extract `handleSwagger` and hoist route consts
