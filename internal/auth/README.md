@@ -50,7 +50,6 @@ internal/auth/
   repositories.go        Repository: the SQL, behind an interface so the service can be faked
   handlers.go            HTTP: redirects, /me, logout, failLogin
   handlers_cookie.go     the only place cookie attributes are chosen (name, path, domain, prefix)
-  middleware.go          AuthenticationWithSession: sid cookie -> user in context
   models.go              User, Session, LoginTransaction, GoogleIdentityParams
   model_services.go      LoginRedirect, CallbackInput, LoginResult (service boundary)
   model_handlers.go      UserResponse, MeResponse (the JSON shapes)
@@ -148,7 +147,7 @@ The ones this package serves:
 |---|---|---|
 | `40101` | `SESSION_COOKIE_ABSENT` | no `sid` cookie on the request |
 | `40102` | `SESSION_INVALID` | `sid` present but `SessionUser` refused it |
-| `40103` | `USER_NOT_IN_CONTEXT` | handler ran without `AuthenticationWithSession` populating the context |
+| `40103` | `USER_NOT_IN_CONTEXT` | handler ran without `middleware.RequireSession` populating the context |
 | `40301` | `CSRF_COOKIE_ABSENT` | unsafe method with no `csrf` cookie |
 | `40302` | `CSRF_TOKEN_MISMATCH` | header and cookie disagree |
 | `50001` | `INTERNAL` | anything unclassified, including a failed logout |
@@ -340,7 +339,7 @@ re-introducing it with a backfill from `google_sub`.
 lets `CallbackLogin` separate "their fault" (`login_failed`) from "our fault" (`server_error`) with
 one `errors.Is`. Anything that is not an `*APIError` is served as `50001`, so an unclassified failure
 cannot leak its text. Every handler in this package sets `Cache-Control: no-store` on its own
-responses, including the failure redirects; `AuthenticationWithSession`'s 401s do not, because they are
+responses, including the failure redirects; `middleware.RequireSession`'s 401s do not, because they are
 served straight through `ReturnWithError`.
 
 Log the cause on the server; never return an internal error, and never log a cookie value, sealed
@@ -463,7 +462,7 @@ stays in Testing with team accounts as test users, no logo during the MVP.
 - **Neither this design nor the table it replaced resists cookie-forcing.** An attacker who can set
   the victim's `oauth_tx` can complete a login as *their own* Google account in the victim's browser
   (login CSRF). Prefixed cookies and HTTPS are what prevent the delivery; no payload format helps.
-- **`AuthenticationWithSession` collapses every `SessionUser` failure into `40102`** and clears the cookie, so a
+- **`middleware.RequireSession` collapses every `SessionUser` failure into `40102`** and clears the cookie, so a
   database outage signs users out and reads to the SPA as an expired session. The sentinels needed to
   tell those apart (`ErrNoSession`, `ErrNoUser`) already exist — map them when it matters.
 - **A session read costs a query per authenticated request.** That read is exactly what makes logout
