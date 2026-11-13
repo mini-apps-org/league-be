@@ -167,8 +167,13 @@ func (h *Handler) noStore(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-store")
 }
 
-// SessionUser lets middleware.Auth resolve a session without reaching past the
-// handler into the service.
-func (h *Handler) SessionUser(ctx context.Context, sessionID string) (*User, error) {
-	return h.service.SessionUser(ctx, sessionID)
+// AuthenticateSession lets middleware.RequireSession resolve a session without
+// reaching past the handler into the service, and without knowing about User:
+// it returns the context already carrying the user.
+func (h *Handler) AuthenticateSession(ctx context.Context, sessionID string) (context.Context, error) {
+	user, err := h.service.SessionUser(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return WithUser(ctx, user), nil
 }

@@ -25,23 +25,28 @@ type Router struct {
 }
 
 func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
+	authHandler, err := r.newAuthHandler(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	mw := middleware.New(r.Config, auth.CSRFCookieName(r.Config), authHandler)
+
 	router := mux.NewRouter()
-	router.Use(middleware.SecurityHeaders)
+	router.Use(mw.SecurityHeaders)
 
 	if r.Config.IsProduction() {
-		router.Use(middleware.HSTS)
+		router.Use(mw.HSTS)
 	}
 
 	handleSwagger(router)
 
 	api := router.PathPrefix(PrefixAPIV1).Subrouter()
 
-	api.Use(middleware.NewCSRF(r.Config, auth.CSRFCookieName(r.Config)).Require)
+	api.Use(mw.RequireCSRF)
 
 	r.registerHealthRoute(api)
-	if err := r.registerAuthRoute(ctx, api); err != nil {
-		return nil, err
-	}
+	registerAuthRoute(api, authHandler, mw)
 
 	return router, nil
 }
