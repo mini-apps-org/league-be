@@ -16,12 +16,11 @@ type User struct {
 }
 
 // The authenticated user travels in the request context. The key and both
-// accessors live here, beside User, rather than with AuthenticationWithSession in
-// platform/middleware: Handler.Me reads the user back, so auth would have to
-// import middleware, which already imports auth — a cycle the compiler refuses.
+// accessors live here, beside User, rather than in platform/middleware: platform
+// never imports a feature, so middleware only receives the enriched context.
 type userKey struct{}
 
-// WithUser is called by middleware.Auth.AuthenticationWithSession once a session resolves.
+// WithUser is called by Handler.AuthenticateSession once a session resolves.
 func WithUser(ctx context.Context, user *User) context.Context {
 	return context.WithValue(ctx, userKey{}, user)
 }

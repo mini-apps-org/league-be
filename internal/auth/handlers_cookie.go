@@ -163,7 +163,7 @@ func CSRFCookieName(cfg *config.Config) string {
 }
 
 // GetSessionCookie and ClearSessionCookie are the session-cookie surface
-// middleware.Auth needs; sessionCookie itself stays unexported.
+// middleware.RequireSession needs; sessionCookie itself stays unexported.
 func (h *Handler) GetSessionCookie(r *http.Request) string {
 	return h.getCookie(r, sessionCookie)
 }

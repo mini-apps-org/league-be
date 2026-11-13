@@ -14,7 +14,7 @@ Conventions and the release steps live in
 HTTP request
    │
    ▼
-cors → SecurityHeaders → HSTS (prod) → CSRF (unsafe methods) → AuthenticationWithSession (per route)
+cors → SecurityHeaders → HSTS (prod) → CSRF (unsafe methods) → RequireSession (per route)
    │
    ▼
 HANDLER      internal/auth/handlers.go       cookies, query params, status codes, redirects
@@ -84,7 +84,7 @@ cmd/server/main.go
 
 Imports point one way: `router → auth → platform/{config,db,handler,model} → {common,secret}`.
 `platform` never imports a feature — the CSRF middleware is *given* the cookie name
-(`middleware.NewCSRF(cfg, auth.CSRFCookieName(cfg))`) rather than importing `auth`.
+(`middleware.New(cfg, auth.CSRFCookieName(cfg), authHandler)`) rather than importing `auth`.
 
 `router` is the only package that knows a feature's constructors exist.
 
@@ -94,12 +94,12 @@ Imports point one way: `router → auth → platform/{config,db,handler,model} �
 
 ```
 CSRF             GET is safe → pass through
-AuthenticationWithSession      sid cookie → service.SessionUser(ctx, sid)
+RequireSession                 sid cookie → authHandler.AuthenticateSession → service.SessionUser(ctx, sid)
   SERVICE        repo.GetSession(ctx, sid, now-sessionTTL, now-idleTTL)
     REPOSITORY   SELECT … WHERE id=$1 AND created_at>$2 AND last_seen_at>$3
                  pgx.ErrNoRows → ErrNoSession
   SERVICE        repo.GetUserByID(…)  then  repo.UpdateSessionLastSeenAt(…)
-AuthenticationWithSession      ok → user into ctx;  err → clear cookie, 401 40102
+RequireSession                 ok → user into ctx;  err → clear cookie, 401 40102
 HANDLER          ExtractUserFromContext(ctx) → ReturnWithJSON(200, SuccessResponse{Data: MeResponse{…}})
 ```
 
@@ -154,6 +154,6 @@ repository selects `limit + 1`, and `model.NewCursorReponse(...)` builds the pag
 | Repository returns `handler.Error(...)` | Return a sentinel; the service maps it |
 | Repository returns `pgx.ErrNoRows` | Translate to a package sentinel |
 | `db:"…"` struct returned as JSON | `newXResponse(...)` in `model_handlers.go` |
-| `platform` imports a feature | Inject the value (see `NewCSRF`) |
+| `platform` imports a feature | Inject the value (see `middleware.New`) |
 | Values formatted into SQL | Placeholders + `args` — `database.md` §4 |
 | Unbounded `SELECT` | `Normalise()` + keyset — `database.md` §9 |

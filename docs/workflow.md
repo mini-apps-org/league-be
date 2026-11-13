@@ -31,7 +31,7 @@ router → <feature> → platform/{config,db,handler,model} → {common,secret}
 
 A feature package never imports `router`, and `platform` never imports a feature.
 When platform code needs a feature's value, it is **injected**, not imported —
-`middleware.NewCSRF(cfg, auth.CSRFCookieName(cfg))` is the pattern.
+`middleware.New(cfg, auth.CSRFCookieName(cfg), authHandler)` is the pattern.
 
 Split a file before it gets long. `handlers_cookie.go` exists because cookie
 attributes are one concern and one concern gets one file.
@@ -67,10 +67,10 @@ Retired codes (`40002`, `40303`) stay retired and are marked as such in the file
 - Wire structs are separate from db structs. `model_handlers.go` holds the response shape
   and a `newXResponse(...)` mapper; a `db:"..."` struct is never serialized directly.
 - Routes are registered in `internal/platform/router/<feature>.go` as
-  `registerXRoute(ctx, api)`, and wired from `NewRouter`. The feature's constructors
+  `registerXRoute(api, ...)`, and wired from `NewRouter`. The feature's constructors
   (`NewRepo` → `NewService` → `NewHandler`) are assembled there and nowhere else.
 - Mounting under `PrefixAPIV1` gives you CSRF on every unsafe method for free. Auth is
-  opt-in per route: `authHandler.AuthenticationWithSession(http.HandlerFunc(h.Me))`.
+  opt-in per route: `mw.RequireSession(http.HandlerFunc(h.Me))`.
 - Every handler carries swagger annotations — `@Summary`, `@Tags`, `@Success`, one
   `@Failure` per code it can return, `@Security CSRFToken` on unsafe methods, `@Router`.
 

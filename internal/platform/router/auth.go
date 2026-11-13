@@ -11,15 +11,15 @@ import (
 	"github.com/nguyentanvinh/league-be/internal/secret"
 )
 
-func (r *Router) registerAuthRoute(ctx context.Context, api *mux.Router) error {
+func (r *Router) newAuthHandler(ctx context.Context) (*auth.Handler, error) {
 	googleAuth, err := auth.NewGoogleAuth(ctx, *r.Config)
 	if err != nil {
-		return fmt.Errorf("router: google auth: %w", err)
+		return nil, fmt.Errorf("router: google auth: %w", err)
 	}
 
 	sealer, err := secret.NewBox(r.Config.Auth.EncryptionKey, r.Config.Auth.EncryptionKeyVersion)
 	if err != nil {
-		return fmt.Errorf("router: encryption key: %w", err)
+		return nil, fmt.Errorf("router: encryption key: %w", err)
 	}
 
 	authRepo := auth.NewRepo(r.Pool)
@@ -29,15 +29,16 @@ func (r *Router) registerAuthRoute(ctx context.Context, api *mux.Router) error {
 
 	authService.StartSessionCleanup(ctx)
 
+	return &authHandler, nil
+}
+
+func registerAuthRoute(api *mux.Router, authHandler *auth.Handler, mw *middleware.Middleware) {
 	authRouter := api.PathPrefix("/auth/google").Subrouter()
 	authRouter.HandleFunc("/login", authHandler.Login).Methods(http.MethodGet)
 	authRouter.HandleFunc("/callback", authHandler.CallbackLogin).Methods(http.MethodGet)
 
 	api.Handle("/auth/logout", http.HandlerFunc(authHandler.Logout)).Methods(http.MethodPost)
-	authMiddleware := middleware.NewAuthentication(r.Config, &authHandler)
 	api.Handle("/me",
-		authMiddleware.Require(http.HandlerFunc(authHandler.Me)),
+		mw.RequireSession(http.HandlerFunc(authHandler.Me)),
 	).Methods(http.MethodGet)
-
-	return nil
 }
