@@ -122,14 +122,30 @@ func (h *Handler) CallbackLogin(w http.ResponseWriter, r *http.Request) {
 //	@Failure	401	{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID | 40103 USER_NOT_IN_CONTEXT"
 //	@Router		/me [get]
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
-	user, ok := ExtractUserFromContext(r.Context())
+	ctx := r.Context()
+	userID, ok := h.ExtractUserIDFromContext(ctx)
 	if !ok {
-		h.ReturnWithError(w, r, handler.Error(handler.CodeNoUserInContext, errors.New("no user in context")))
+		h.ReturnWithError(w, r, handler.Error(handler.CodeNoUserInContext, errors.New("no user id in context")))
+		return
+	}
+
+	user, err := h.service.GetUser(ctx, userID)
+	switch {
+	case errors.Is(err, ErrNoUser):
+		// Deleted after RequireSession passed; the cascade has already dropped the session.
+		h.ReturnWithError(w, r, handler.Error(handler.CodeSessionInvalid, err))
+		return
+	case err != nil:
+		h.ReturnWithError(w, r, handler.Error(handler.CodeInternal, err))
 		return
 	}
 
 	h.noStore(w)
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Data: MeResponse{User: newUserResponse(user)}})
+	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Data: MeResponse{
+		User:        newUserResponse(&user.User),
+		Roles:       user.Roles,
+		Permissions: user.Permissions,
+	}})
 }
 
 // Logout revokes this session.
@@ -169,11 +185,11 @@ func (h *Handler) noStore(w http.ResponseWriter) {
 
 // AuthenticateSession lets middleware.RequireSession resolve a session without
 // reaching past the handler into the service, and without knowing about User:
-// it returns the context already carrying the user.
+// it returns the context already carrying the user id.
 func (h *Handler) AuthenticateSession(ctx context.Context, sessionID string) (context.Context, error) {
-	user, err := h.service.SessionUser(ctx, sessionID)
+	userID, err := h.service.SessionUserID(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}
-	return WithUser(ctx, user), nil
+	return handler.ContextWithUserID(ctx, userID), nil
 }

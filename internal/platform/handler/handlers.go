@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -53,4 +54,14 @@ func (h *Handler) DecodeJSON(w http.ResponseWriter, r *http.Request, dest any) e
 		return errors.New("body must contain a single JSON object")
 	}
 	return nil
+}
+
+// ContextWithUserID is called by auth.Handler.AuthenticateSession once a session resolves.
+func ContextWithUserID(ctx context.Context, userID string) context.Context {
+	return context.WithValue(ctx, config.ContextKeyUserID, userID)
+}
+
+func (h *Handler) ExtractUserIDFromContext(ctx context.Context) (string, bool) {
+	userID, ok := ctx.Value(config.ContextKeyUserID).(string)
+	return userID, ok && userID != ""
 }

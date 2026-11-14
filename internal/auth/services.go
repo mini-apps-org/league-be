@@ -20,7 +20,8 @@ const loginTxTTL = 10 * time.Minute
 type Service interface {
 	StartGoogleLogin(ctx context.Context) (LoginRedirect, error)
 	CompleteLogin(ctx context.Context, in CallbackInput) (LoginResult, error)
-	SessionUser(ctx context.Context, sessionID string) (*User, error)
+	SessionUserID(ctx context.Context, sessionID string) (string, error)
+	GetUser(ctx context.Context, id string) (*UserWithAccess, error)
 	Logout(ctx context.Context, sessionID string) error
 	StartSessionCleanup(ctx context.Context)
 }
@@ -121,25 +122,27 @@ func (s *service) CompleteLogin(ctx context.Context, in CallbackInput) (LoginRes
 	return LoginResult{SessionID: sessionID, IsNewUser: isNewUser, User: user}, nil
 }
 
-func (s *service) SessionUser(ctx context.Context, sessionID string) (*User, error) {
+// SessionUserID resolves a live session to its user id without loading the
+// user: users_sessions.user_id cascades on delete, so a live session always
+// points at an existing user.
+func (s *service) SessionUserID(ctx context.Context, sessionID string) (string, error) {
 	now := time.Now()
 
 	session, err := s.repo.GetSession(ctx, sessionID, now.Add(-s.sessionTTL), now.Add(-s.idleTTL))
 	if err != nil {
-		return nil, err
-	}
-
-	user, err := s.repo.GetUserByID(ctx, session.UserID)
-	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	// Extend the idle window on every read: the write is cheap, and skipping it
 	// would let an active session expire mid-use.
 	if err := s.repo.UpdateSessionLastSeenAt(ctx, sessionID); err != nil {
-		return nil, err
+		return "", err
 	}
-	return user, nil
+	return session.UserID, nil
+}
+
+func (s *service) GetUser(ctx context.Context, id string) (*UserWithAccess, error) {
+	return s.repo.GetUserByID(ctx, id)
 }
 
 func (s *service) Logout(ctx context.Context, sessionID string) error {

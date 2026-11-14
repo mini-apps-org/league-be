@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"time"
 )
 
@@ -15,19 +14,14 @@ type User struct {
 	LastLoginAt   time.Time `db:"last_login_at"`
 }
 
-// The authenticated user travels in the request context. The key and both
-// accessors live here, beside User, rather than in platform/middleware: platform
-// never imports a feature, so middleware only receives the enriched context.
-type userKey struct{}
-
-// WithUser is called by Handler.AuthenticateSession once a session resolves.
-func WithUser(ctx context.Context, user *User) context.Context {
-	return context.WithValue(ctx, userKey{}, user)
-}
-
-func ExtractUserFromContext(ctx context.Context) (*User, bool) {
-	user, ok := ctx.Value(userKey{}).(*User)
-	return user, ok
+// UserWithAccess is a User plus the role and permission codes it holds, for the
+// SPA to show or hide routes and controls. A separate type rather than fields on
+// User: RowToStructByName needs a column for every field, and only
+// GetUserByID selects these.
+type UserWithAccess struct {
+	User
+	Roles       []string `db:"roles"`
+	Permissions []string `db:"permissions"`
 }
 
 // GoogleIdentityParams carries ID token claims into the upsert. Every field

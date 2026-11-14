@@ -11,6 +11,7 @@ type ContextKey string
 
 const (
 	ContextKeyRequestID ContextKey = "request-id"
+	ContextKeyUserID    ContextKey = "user-id"
 )
 
 var AllowHeadersAPI = []string{"Accept", "Content-Type", "Origin", "X-CSRF-Token"}

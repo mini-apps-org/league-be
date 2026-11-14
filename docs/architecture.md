@@ -94,13 +94,14 @@ Imports point one way: `router → auth → platform/{config,db,handler,model} �
 
 ```
 CSRF             GET is safe → pass through
-RequireSession                 sid cookie → authHandler.AuthenticateSession → service.SessionUser(ctx, sid)
+RequireSession                 sid cookie → authHandler.AuthenticateSession → service.SessionUserID(ctx, sid)
   SERVICE        repo.GetSession(ctx, sid, now-sessionTTL, now-idleTTL)
     REPOSITORY   SELECT … WHERE id=$1 AND created_at>$2 AND last_seen_at>$3
                  pgx.ErrNoRows → ErrNoSession
-  SERVICE        repo.GetUserByID(…)  then  repo.UpdateSessionLastSeenAt(…)
-RequireSession                 ok → user into ctx;  err → clear cookie, 401 40102
-HANDLER          ExtractUserFromContext(ctx) → ReturnWithJSON(200, SuccessResponse{Data: MeResponse{…}})
+  SERVICE        repo.UpdateSessionLastSeenAt(…)
+RequireSession                 ok → user id into ctx;  err → clear cookie, 401 40102
+HANDLER          ExtractUserIDFromContext(ctx) → service.GetUser(ctx, id) → repo.GetUserByID(…)
+                 → ReturnWithJSON(200, SuccessResponse{Data: MeResponse{…}})
 ```
 
 Note that `GetSession` takes two `time.Time` cutoffs, not TTLs: deciding they are

@@ -43,7 +43,7 @@ the double-submit middleware.
 
 ```
 internal/auth/
-  services.go            Service: StartGoogleLogin, CompleteLogin, SessionUser, Logout,
+  services.go            Service: StartGoogleLogin, CompleteLogin, SessionUserID, GetUser, Logout,
                          StartSessionCleanup (the daily expiry sweep, a goroutine off ctx)
   services_google.go     GoogleAuth: OIDC discovery, AuthCodeURL, Identify (verified claims)
   login_transaction.go   seal/open the oauth_tx payload — two functions over *secret.Box
@@ -146,7 +146,7 @@ The ones this package serves:
 | Code | Reason (logs + docs) | Meaning |
 |---|---|---|
 | `40101` | `SESSION_COOKIE_ABSENT` | no `sid` cookie on the request |
-| `40102` | `SESSION_INVALID` | `sid` present but `SessionUser` refused it |
+| `40102` | `SESSION_INVALID` | `sid` present but `SessionUserID` refused it |
 | `40103` | `USER_NOT_IN_CONTEXT` | handler ran without `middleware.RequireSession` populating the context |
 | `40301` | `CSRF_COOKIE_ABSENT` | unsafe method with no `csrf` cookie |
 | `40302` | `CSRF_TOKEN_MISMATCH` | header and cookie disagree |
@@ -462,7 +462,7 @@ stays in Testing with team accounts as test users, no logo during the MVP.
 - **Neither this design nor the table it replaced resists cookie-forcing.** An attacker who can set
   the victim's `oauth_tx` can complete a login as *their own* Google account in the victim's browser
   (login CSRF). Prefixed cookies and HTTPS are what prevent the delivery; no payload format helps.
-- **`middleware.RequireSession` collapses every `SessionUser` failure into `40102`** and clears the cookie, so a
+- **`middleware.RequireSession` collapses every `SessionUserID` failure into `40102`** and clears the cookie, so a
   database outage signs users out and reads to the SPA as an expired session. The sentinels needed to
   tell those apart (`ErrNoSession`, `ErrNoUser`) already exist — map them when it matters.
 - **A session read costs a query per authenticated request.** That read is exactly what makes logout

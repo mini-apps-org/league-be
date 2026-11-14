@@ -20,7 +20,7 @@ const userColumns = "id, email, email_verified, name, avatar_url, created_at, la
 
 type Repository interface {
 	UpsertGoogleIdentity(ctx context.Context, p GoogleIdentityParams) (*User, bool, error)
-	GetUserByID(ctx context.Context, id string) (*User, error)
+	GetUserByID(ctx context.Context, id string) (*UserWithAccess, error)
 
 	CreateSession(ctx context.Context, s Session) error
 	GetSession(ctx context.Context, id string, absoluteCutoff, idleCutoff time.Time) (*Session, error)
@@ -80,13 +80,28 @@ RETURNING ` + userColumns + `, (xmax = 0) AS is_new_user`
 	return &u, isNewUser, nil
 }
 
-func (r *repository) GetUserByID(ctx context.Context, id string) (*User, error) {
-	const query = `SELECT ` + userColumns + ` FROM users WHERE id = $1`
+// GetUserByID returns the user with its role and permission codes in one
+// statement. The subqueries correlate on users.id and COALESCE to '{}', so a
+// user with no role gets empty arrays rather than NULL.
+func (r *repository) GetUserByID(ctx context.Context, id string) (*UserWithAccess, error) {
+	const query = `
+SELECT ` + userColumns + `,
+	COALESCE((SELECT array_agg(ro.code ORDER BY ro.code)
+	          FROM users_roles ur
+	          JOIN roles ro ON ro.id = ur.role_id
+	          WHERE ur.user_id = users.id), '{}') AS roles,
+	COALESCE((SELECT array_agg(DISTINCT p.code ORDER BY p.code)
+	          FROM users_roles ur
+	          JOIN roles_permissions rp ON rp.role_id = ur.role_id
+	          JOIN permissions p        ON p.id = rp.permission_id
+	          WHERE ur.user_id = users.id), '{}') AS permissions
+FROM users
+WHERE id = $1`
 	args := []any{
 		id,
 	}
 
-	user, err := queryOne[User](ctx, r.pgPool, query, args...)
+	user, err := repo.QueryOne[UserWithAccess](ctx, r.pgPool, query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNoUser
 	}
@@ -178,19 +193,4 @@ func (r *repository) DeleteExpiredSessions(ctx context.Context, absoluteCutoff, 
 		return 0, fmt.Errorf("auth: delete expired sessions: %w", err)
 	}
 	return tag.RowsAffected(), nil
-}
-
-// queryOne maps one row onto T by column name. It returns the raw error so a
-// caller can match pgx.ErrNoRows; wrapping is the caller's job.
-func queryOne[T any](ctx context.Context, pool *pgxpool.Pool, query string, args ...any) (*T, error) {
-	rows, err := pool.Query(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[T])
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
 }
