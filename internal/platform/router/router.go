@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nguyentanvinh/league-be/internal/auth"
+	"github.com/nguyentanvinh/league-be/internal/permissions"
 	"github.com/nguyentanvinh/league-be/internal/platform/config"
 	"github.com/nguyentanvinh/league-be/internal/platform/middleware"
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -30,7 +31,9 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 		return nil, err
 	}
 
-	mw := middleware.New(r.Config, auth.CSRFCookieName(r.Config), authHandler)
+	permissionService := permissions.NewService(permissions.NewRepo(r.Pool))
+
+	mw := middleware.New(r.Config, auth.CSRFCookieName(r.Config), authHandler, permissionService)
 
 	router := mux.NewRouter()
 	router.Use(mw.SecurityHeaders)
@@ -47,6 +50,7 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 
 	r.registerHealthRoute(api)
 	registerAuthRoute(api, authHandler, mw)
+	r.registerRoleRoute(api, mw, permissionService)
 
 	return router, nil
 }

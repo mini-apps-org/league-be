@@ -1,7 +1,20 @@
 basePath: /api/v1
 definitions:
-  auth.MeResponse:
+  auth.CurrentUserResponse:
     properties:
+      permissions:
+        example:
+        - match.create
+        - match.update
+        items:
+          type: string
+        type: array
+      roles:
+        example:
+        - CAPTAIN
+        items:
+          type: string
+        type: array
       user:
         $ref: '#/definitions/auth.UserResponse'
     type: object
@@ -12,7 +25,7 @@ definitions:
       email:
         type: string
       id:
-        type: integer
+        type: string
       name:
         type: string
     type: object
@@ -45,7 +58,9 @@ definitions:
     - "40301"
     - "40302"
     - "40304"
+    - "40305"
     - "40401"
+    - "40901"
     - "42901"
     - "50001"
     - "50201"
@@ -59,7 +74,9 @@ definitions:
     - CodeCSRFCookieMissing
     - CodeCSRFTokenMismatch
     - CodeForbidden
+    - CodePermissionDenied
     - CodeNotFound
+    - CodeConflict
     - CodeRateLimited
     - CodeInternal
     - CodeUpstream
@@ -67,6 +84,21 @@ definitions:
     properties:
       error:
         $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorBody'
+    type: object
+  permissions.PermissionResponse:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
     type: object
   platform_router.HealthResponse:
     properties:
@@ -76,6 +108,55 @@ definitions:
         type: string
       ok:
         type: boolean
+    type: object
+  roles.CreateRoleRequest:
+    properties:
+      code:
+        example: LEAGUE_OPERATOR
+        type: string
+      description:
+        example: Runs the leagues they are assigned to.
+        type: string
+      name:
+        example: League Operator
+        type: string
+    type: object
+  roles.RoleCode:
+    enum:
+    - SUPER_ADMIN
+    - CAPTAIN
+    - PLAYER
+    type: string
+    x-enum-varnames:
+    - CodeSuperAdmin
+    - CodeCaptain
+    - CodePlayer
+  roles.RoleResponse:
+    properties:
+      code:
+        $ref: '#/definitions/roles.RoleCode'
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      permissions:
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+    type: object
+  roles.UpdateRoleRequest:
+    properties:
+      description:
+        type: string
+      name:
+        example: Team Captain
+        type: string
     type: object
 info:
   contact: {}
@@ -166,7 +247,7 @@ paths:
             - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/auth.MeResponse'
+                  $ref: '#/definitions/auth.CurrentUserResponse'
               type: object
         "401":
           description: 40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID | 40103
@@ -176,6 +257,236 @@ paths:
       summary: Current user
       tags:
       - auth
+  /permissions:
+    get:
+      description: 'The catalog is a fixed vocabulary, returned whole. It is read-only
+        over HTTP: codes are compared by authorization code elsewhere in the backend,
+        so they are added and removed by migration.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/permissions.PermissionResponse'
+                  type: array
+              type: object
+        "401":
+          description: 40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 40305 PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      summary: List permissions
+      tags:
+      - permissions
+  /permissions/{id}:
+    get:
+      parameters:
+      - description: permission id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/permissions.PermissionResponse'
+              type: object
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 40401 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      summary: Get a permission
+      tags:
+      - permissions
+  /roles:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/roles.RoleResponse'
+                  type: array
+              type: object
+        "401":
+          description: 40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 40305 PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      summary: List roles
+      tags:
+      - roles
+    post:
+      consumes:
+      - application/json
+      description: '`code` is the authorization contract and cannot be changed afterwards.'
+      parameters:
+      - description: role to create
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/roles.CreateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/roles.RoleResponse'
+              type: object
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305
+            PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 40901 CONFLICT
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Create a role
+      tags:
+      - roles
+  /roles/{id}:
+    delete:
+      description: 'Cascades: rows in roles_permissions and users_roles go with it,
+        so everyone holding this role loses what it granted. SUPER_ADMIN cannot be
+        deleted.'
+      parameters:
+      - description: role id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: deleted
+        "404":
+          description: 40401 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 40901 CONFLICT (SUPER_ADMIN)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Delete a role
+      tags:
+      - roles
+    get:
+      parameters:
+      - description: role id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/roles.RoleResponse'
+              type: object
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 40401 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      summary: Get a role
+      tags:
+      - roles
+    patch:
+      consumes:
+      - application/json
+      description: 'Partial update: an absent field is left unchanged. `code` cannot
+        be changed — create a new role instead.'
+      parameters:
+      - description: role id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/roles.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/roles.RoleResponse'
+              type: object
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 40401 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Update a role
+      tags:
+      - roles
 securityDefinitions:
   CSRFToken:
     description: Echo the value of the `csrf` cookie. Required on every state-changing
