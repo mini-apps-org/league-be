@@ -24,6 +24,7 @@ type RoleResponse struct {
 }
 
 func newRoleResponse(role Role) RoleResponse {
+	//lint:ignore S1016 explicit mapping keeps the db row and JSON response independent
 	return RoleResponse{
 		ID:          role.ID,
 		Code:        role.Code,
