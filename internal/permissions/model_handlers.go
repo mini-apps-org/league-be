@@ -12,8 +12,7 @@ type PermissionResponse struct {
 }
 
 func newPermissionResponse(permission Permission) PermissionResponse {
-	//lint:ignore S1016 explicit mapping keeps the db row and JSON response independent
-	return PermissionResponse{
+	return PermissionResponse{ //nolint:staticcheck // S1016: explicit mapping keeps the db row and JSON response independent
 		ID:          permission.ID,
 		Code:        permission.Code,
 		Name:        permission.Name,

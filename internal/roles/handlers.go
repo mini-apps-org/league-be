@@ -120,8 +120,7 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//lint:ignore S1016 explicit mapping keeps the JSON and service types independent
-	role, err := h.service.UpdateRole(r.Context(), id, UpdateRoleServiceParams{
+	role, err := h.service.UpdateRole(r.Context(), id, UpdateRoleServiceParams{ //nolint:staticcheck // S1016: explicit mapping keeps the JSON and service types independent
 		Name:        body.Name,
 		Description: body.Description,
 	})
