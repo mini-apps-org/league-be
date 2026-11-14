@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nguyentanvinh/league-be/internal/platform/handler/repo"
 )
 
 var (
@@ -119,7 +120,7 @@ WHERE id = $1 AND created_at > $2 AND last_seen_at > $3`
 		idleCutoff,     // $3 last_seen_at floor
 	}
 
-	session, err := queryOne[Session](ctx, r.pgPool, query, args...)
+	session, err := repo.QueryOne[Session](ctx, r.pgPool, query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNoSession
 	}
