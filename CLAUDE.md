@@ -13,6 +13,9 @@
 When writing or editing any `internal/*/repositories.go` — the only layer that
 speaks SQL — follow @.claude/rules/database.md
 
+When naming any function, method, type, constant or variable, follow
+@.claude/rules/naming.md
+
 ## CodeGraph — preferred search tool
 
 **Prefer CodeGraph over `grep`/`find`/`Read` for locating symbols, tracing call flows, and exploring file structure.** CodeGraph is the pre-built AST index — faster, more accurate, and cheaper than file scans.
