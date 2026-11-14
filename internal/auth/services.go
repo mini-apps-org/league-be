@@ -115,7 +115,7 @@ func (s *service) CompleteLogin(ctx context.Context, in CallbackInput) (LoginRes
 		return LoginResult{}, err
 	}
 
-	if err := s.repo.CreateSession(ctx, Session{ID: sessionID, UserID: user.ID}); err != nil {
+	if err := s.repo.ReplaceSession(ctx, Session{ID: sessionID, UserID: user.ID}); err != nil {
 		return LoginResult{}, err
 	}
 

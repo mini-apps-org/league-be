@@ -301,6 +301,7 @@ Go, because a session id must come from a CSPRNG the application controls.
 | `CreateSession` | `INSERT INTO users_sessions …` |
 | `GetSession` | `SELECT … WHERE id = $1 AND created_at > $2 AND last_seen_at > $3` — both TTLs |
 | `UpdateSessionLastSeenAt` | `UPDATE users_sessions SET last_seen_at = now()` |
+| `ReplaceSession` | sign-in; replaces the previous device's session (one per user) |
 | `DeleteSession` / `DeleteUserSessions` | logout one device / all devices |
 | `DeleteExpiredSessions` | `DELETE … WHERE created_at <= $1 OR last_seen_at <= $2` (startup + every 24h) |
 

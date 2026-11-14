@@ -22,7 +22,7 @@ type Repository interface {
 	UpsertGoogleIdentity(ctx context.Context, p GoogleIdentityParams) (*User, bool, error)
 	GetUserByID(ctx context.Context, id string) (*UserWithAccess, error)
 
-	CreateSession(ctx context.Context, s Session) error
+	ReplaceSession(ctx context.Context, s Session) error
 	GetSession(ctx context.Context, id string, absoluteCutoff, idleCutoff time.Time) (*Session, error)
 	UpdateSessionLastSeenAt(ctx context.Context, id string) error
 	DeleteSession(ctx context.Context, id string) error
@@ -111,15 +111,23 @@ WHERE id = $1`
 	return user, nil
 }
 
-func (r *repository) CreateSession(ctx context.Context, s Session) error {
-	const query = `INSERT INTO users_sessions (id, user_id) VALUES ($1, $2)`
+// ReplaceSession enforces one device per user: user_id is unique, so a new
+// sign-in overwrites the previous device's row and its sid stops resolving.
+// One statement, so two concurrent sign-ins cannot both keep a session.
+func (r *repository) ReplaceSession(ctx context.Context, s Session) error {
+	const query = `
+INSERT INTO users_sessions (id, user_id) VALUES ($1, $2)
+ON CONFLICT (user_id) DO UPDATE SET
+    id           = EXCLUDED.id,
+    created_at   = now(),
+    last_seen_at = now()`
 	args := []any{
 		s.ID,     // $1 id
 		s.UserID, // $2 user_id
 	}
 
 	if _, err := r.pgPool.Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("auth: create session: %w", err)
+		return fmt.Errorf("auth: replace session: %w", err)
 	}
 	return nil
 }
