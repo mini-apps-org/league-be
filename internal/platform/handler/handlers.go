@@ -56,7 +56,6 @@ func (h *Handler) DecodeJSON(w http.ResponseWriter, r *http.Request, dest any) e
 	return nil
 }
 
-// ContextWithUserID is called by auth.Handler.AuthenticateSession once a session resolves.
 func ContextWithUserID(ctx context.Context, userID string) context.Context {
 	return context.WithValue(ctx, config.ContextKeyUserID, userID)
 }

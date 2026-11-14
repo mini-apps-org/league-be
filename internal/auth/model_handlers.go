@@ -9,20 +9,17 @@ type UserResponse struct {
 	AvatarURL string `json:"avatarUrl"`
 }
 
-// MeResponse is /api/v1/me minus `settings` and `apiKey`: neither table exists
-// until M2. Roles and Permissions are always arrays, never null, so the SPA can
-// call includes() on them without a guard.
-type MeResponse struct {
+type CurrentUserResponse struct {
 	User        UserResponse `json:"user"`
 	Roles       []string     `json:"roles" example:"CAPTAIN"`
 	Permissions []string     `json:"permissions" example:"match.create,match.update"`
 }
 
-func newUserResponse(u *User) UserResponse {
+func newUserResponse(user *User) UserResponse {
 	return UserResponse{
-		ID:        u.ID,
-		Email:     u.Email,
-		Name:      u.Name,
-		AvatarURL: u.AvatarURL,
+		ID:        user.ID,
+		Email:     user.Email,
+		Name:      user.Name,
+		AvatarURL: user.AvatarURL,
 	}
 }

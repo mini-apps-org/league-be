@@ -19,8 +19,8 @@ const loginTxTTL = 10 * time.Minute
 
 type Service interface {
 	StartGoogleLogin(ctx context.Context) (LoginRedirect, error)
-	CompleteLogin(ctx context.Context, in CallbackInput) (LoginResult, error)
-	SessionUserID(ctx context.Context, sessionID string) (string, error)
+	CompleteLogin(ctx context.Context, input CallbackInput) (LoginResult, error)
+	GetSessionUserID(ctx context.Context, sessionID string) (string, error)
 	GetUser(ctx context.Context, id string) (*UserWithAccess, error)
 	Logout(ctx context.Context, sessionID string) error
 	StartSessionCleanup(ctx context.Context)
@@ -77,21 +77,21 @@ func (s *service) StartGoogleLogin(ctx context.Context) (LoginRedirect, error) {
 // CompleteLogin refuses a forged or expired oauth_tx cookie, or a mismatched
 // state, before Google is contacted. Replay is stopped by Google's codes being
 // one-time, not by us.
-func (s *service) CompleteLogin(ctx context.Context, in CallbackInput) (LoginResult, error) {
-	if in.OAuthTx == "" {
+func (s *service) CompleteLogin(ctx context.Context, input CallbackInput) (LoginResult, error) {
+	if input.OAuthTx == "" {
 		return LoginResult{}, fmt.Errorf("%w: no oauth_tx cookie", ErrLoginRejected)
 	}
 
-	tx, err := openLoginTx(s.sealer, in.OAuthTx)
+	tx, err := openLoginTx(s.sealer, input.OAuthTx)
 	if err != nil {
 		return LoginResult{}, err
 	}
 
-	if subtle.ConstantTimeCompare([]byte(in.State), []byte(tx.State)) != 1 {
+	if subtle.ConstantTimeCompare([]byte(input.State), []byte(tx.State)) != 1 {
 		return LoginResult{}, fmt.Errorf("%w: state mismatch", ErrLoginRejected)
 	}
 
-	claims, err := s.google.Identify(ctx, in.Code, tx.CodeVerifier, tx.Nonce)
+	claims, err := s.google.Identify(ctx, input.Code, tx.CodeVerifier, tx.Nonce)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -122,10 +122,9 @@ func (s *service) CompleteLogin(ctx context.Context, in CallbackInput) (LoginRes
 	return LoginResult{SessionID: sessionID, IsNewUser: isNewUser, User: user}, nil
 }
 
-// SessionUserID resolves a live session to its user id without loading the
-// user: users_sessions.user_id cascades on delete, so a live session always
-// points at an existing user.
-func (s *service) SessionUserID(ctx context.Context, sessionID string) (string, error) {
+// GetSessionUserID skips loading the user: user_id cascades on delete, so a live
+// session always points at an existing user.
+func (s *service) GetSessionUserID(ctx context.Context, sessionID string) (string, error) {
 	now := time.Now()
 
 	session, err := s.repo.GetSession(ctx, sessionID, now.Add(-s.sessionTTL), now.Add(-s.idleTTL))

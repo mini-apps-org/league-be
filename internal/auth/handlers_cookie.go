@@ -33,8 +33,8 @@ type cookieParams struct {
 	httpOnly bool
 }
 
-// isSecure gates the Secure attribute, which both cookie prefixes require.
-func (h *Handler) isSecure() bool {
+// isSecureCookie gates the Secure attribute, which both cookie prefixes require.
+func (h *Handler) isSecureCookie() bool {
 	return h.Config.IsProduction()
 }
 
@@ -98,7 +98,7 @@ func (h *Handler) setCookie(w http.ResponseWriter, params cookieParams) {
 		Domain:   getCookieDomainByCookieName(h.Config, params.name),
 		MaxAge:   int(params.ttl.Seconds()),
 		HttpOnly: params.httpOnly,
-		Secure:   h.isSecure(),
+		Secure:   h.isSecureCookie(),
 		SameSite: http.SameSiteLaxMode,
 	})
 }

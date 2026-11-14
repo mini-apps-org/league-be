@@ -19,10 +19,10 @@ var (
 const userColumns = "id, email, email_verified, name, avatar_url, created_at, last_login_at"
 
 type Repository interface {
-	UpsertGoogleIdentity(ctx context.Context, p GoogleIdentityParams) (*User, bool, error)
+	UpsertGoogleIdentity(ctx context.Context, params GoogleIdentityParams) (*User, bool, error)
 	GetUserByID(ctx context.Context, id string) (*UserWithAccess, error)
 
-	ReplaceSession(ctx context.Context, s Session) error
+	ReplaceSession(ctx context.Context, session Session) error
 	GetSession(ctx context.Context, id string, absoluteCutoff, idleCutoff time.Time) (*Session, error)
 	UpdateSessionLastSeenAt(ctx context.Context, id string) error
 	DeleteSession(ctx context.Context, id string) error
@@ -38,7 +38,7 @@ func NewRepo(pool *pgxpool.Pool) Repository {
 	return &repository{pgPool: pool}
 }
 
-func (r *repository) UpsertGoogleIdentity(ctx context.Context, p GoogleIdentityParams) (*User, bool, error) {
+func (r *repository) UpsertGoogleIdentity(ctx context.Context, params GoogleIdentityParams) (*User, bool, error) {
 	const query = `
 INSERT INTO users (google_sub, email, email_verified, name, avatar_url, hd)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -51,38 +51,35 @@ ON CONFLICT (google_sub) DO UPDATE SET
     last_login_at  = now()
 RETURNING ` + userColumns + `, (xmax = 0) AS is_new_user`
 	args := []any{
-		p.Subject,       // $1 google_sub
-		p.Email,         // $2 email
-		p.EmailVerified, // $3 email_verified
-		p.Name,          // $4 name
-		p.AvatarURL,     // $5 avatar_url
-		p.HD,            // $6 hd
+		params.Subject,       // $1 google_sub
+		params.Email,         // $2 email
+		params.EmailVerified, // $3 email_verified
+		params.Name,          // $4 name
+		params.AvatarURL,     // $5 avatar_url
+		params.HD,            // $6 hd
 	}
 
 	// Scanned explicitly: is_new_user has no field on User, so RowToStructByName
 	// would reject the extra column. Keep this list in userColumns order.
-	var u User
+	var user User
 	var isNewUser bool
 	err := r.pgPool.QueryRow(ctx, query, args...).Scan(
-		&u.ID,            // id
-		&u.Email,         // email
-		&u.EmailVerified, // email_verified
-		&u.Name,          // name
-		&u.AvatarURL,     // avatar_url
-		&u.CreatedAt,     // created_at
-		&u.LastLoginAt,   // last_login_at
-		&isNewUser,       // (xmax = 0)
+		&user.ID,            // id
+		&user.Email,         // email
+		&user.EmailVerified, // email_verified
+		&user.Name,          // name
+		&user.AvatarURL,     // avatar_url
+		&user.CreatedAt,     // created_at
+		&user.LastLoginAt,   // last_login_at
+		&isNewUser,          // (xmax = 0)
 	)
 	if err != nil {
 		return nil, false, fmt.Errorf("auth: upsert google user: %w", err)
 	}
 
-	return &u, isNewUser, nil
+	return &user, isNewUser, nil
 }
 
-// GetUserByID returns the user with its role and permission codes in one
-// statement. The subqueries correlate on users.id and COALESCE to '{}', so a
-// user with no role gets empty arrays rather than NULL.
 func (r *repository) GetUserByID(ctx context.Context, id string) (*UserWithAccess, error) {
 	const query = `
 SELECT ` + userColumns + `,
@@ -111,10 +108,9 @@ WHERE id = $1`
 	return user, nil
 }
 
-// ReplaceSession enforces one device per user: user_id is unique, so a new
-// sign-in overwrites the previous device's row and its sid stops resolving.
-// One statement, so two concurrent sign-ins cannot both keep a session.
-func (r *repository) ReplaceSession(ctx context.Context, s Session) error {
+// ReplaceSession keeps one session per user: a new sign-in atomically
+// overwrites the previous row, so its sid stops resolving.
+func (r *repository) ReplaceSession(ctx context.Context, session Session) error {
 	const query = `
 INSERT INTO users_sessions (id, user_id) VALUES ($1, $2)
 ON CONFLICT (user_id) DO UPDATE SET
@@ -122,8 +118,8 @@ ON CONFLICT (user_id) DO UPDATE SET
     created_at   = now(),
     last_seen_at = now()`
 	args := []any{
-		s.ID,     // $1 id
-		s.UserID, // $2 user_id
+		session.ID,     // $1 id
+		session.UserID, // $2 user_id
 	}
 
 	if _, err := r.pgPool.Exec(ctx, query, args...); err != nil {

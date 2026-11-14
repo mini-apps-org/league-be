@@ -38,6 +38,6 @@ func registerAuthRoute(api *mux.Router, authHandler *auth.Handler, mw middleware
 
 	api.Handle("/auth/logout", http.HandlerFunc(authHandler.Logout)).Methods(http.MethodPost)
 	api.Handle("/me",
-		mw.RequireSession(http.HandlerFunc(authHandler.Me)),
+		mw.RequireSession(http.HandlerFunc(authHandler.GetCurrentUser)),
 	).Methods(http.MethodGet)
 }

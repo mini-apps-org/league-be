@@ -56,7 +56,7 @@ The layering is typed, not remembered:
 
 | File | Family | Example | Crosses |
 |---|---|---|---|
-| `model_handlers.go` | wire / JSON | `UserResponse`, `MeResponse` | handler ↔ browser |
+| `model_handlers.go` | wire / JSON | `UserResponse`, `CurrentUserResponse` | handler ↔ browser |
 | `model_services.go` | service boundary | `CallbackInput`, `LoginResult` | handler ↔ service |
 | `models.go` | domain + db rows | `User`, `Session` (`db:"…"`) | service ↔ repository ↔ db |
 
@@ -94,14 +94,14 @@ Imports point one way: `router → auth → platform/{config,db,handler,model} �
 
 ```
 CSRF             GET is safe → pass through
-RequireSession                 sid cookie → authHandler.AuthenticateSession → service.SessionUserID(ctx, sid)
+RequireSession                 sid cookie → authHandler.AuthenticateSession → service.GetSessionUserID(ctx, sid)
   SERVICE        repo.GetSession(ctx, sid, now-sessionTTL, now-idleTTL)
     REPOSITORY   SELECT … WHERE id=$1 AND created_at>$2 AND last_seen_at>$3
                  pgx.ErrNoRows → ErrNoSession
   SERVICE        repo.UpdateSessionLastSeenAt(…)
 RequireSession                 ok → user id into ctx;  err → clear cookie, 401 40102
 HANDLER          ExtractUserIDFromContext(ctx) → service.GetUser(ctx, id) → repo.GetUserByID(…)
-                 → ReturnWithJSON(200, SuccessResponse{Data: MeResponse{…}})
+                 → ReturnWithJSON(200, SuccessResponse{Data: CurrentUserResponse{…}})
 ```
 
 Note that `GetSession` takes two `time.Time` cutoffs, not TTLs: deciding they are
@@ -142,7 +142,7 @@ Build inward-out — each layer compiles and is testable before the one above ex
 ```
 
 Pagination is a service concern: `params.Normalise()` runs before the query, the
-repository selects `limit + 1`, and `model.NewCursorReponse(...)` builds the page.
+repository selects `limit + 1`, and `model.NewCursorResponse(...)` builds the page.
 
 ---
 

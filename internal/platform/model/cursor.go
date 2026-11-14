@@ -68,8 +68,8 @@ func DecodeCursor(raw string) (int64, error) {
 	return id, nil
 }
 
-func NewCursorReponse[T any](rows []T, limit int, total int64, idOf func(T) int64) *CursorReponse[T] {
-	page := &CursorReponse[T]{Items: rows, Total: total}
+func NewCursorResponse[T any](rows []T, limit int, total int64, idOf func(T) int64) *CursorResponse[T] {
+	page := &CursorResponse[T]{Items: rows, Total: total}
 
 	if len(rows) > limit {
 		page.Items = rows[:limit]

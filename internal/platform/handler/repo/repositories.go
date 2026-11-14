@@ -37,8 +37,6 @@ func QueryOne[T any](ctx context.Context, pool *pgxpool.Pool, query string, args
 	return &row, nil
 }
 
-// QueryStrings collects a single-column text result — the permission-code
-// queries, where a struct would be one field wide.
 func QueryStrings(ctx context.Context, pool *pgxpool.Pool, query string, args ...any) ([]string, error) {
 	rows, err := pool.Query(ctx, query, args...)
 	if err != nil {

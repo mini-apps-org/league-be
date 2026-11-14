@@ -46,12 +46,12 @@ const (
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	login, err := h.service.StartGoogleLogin(r.Context())
 	if err != nil {
-		h.failLogin(w, r, reasonServerError, err)
+		h.redirectLoginFailure(w, r, reasonServerError, err)
 		return
 	}
 
 	h.setOAuthTxCookie(w, login.OAuthTx)
-	h.noStore(w)
+	h.setNoStoreHeader(w)
 	http.Redirect(w, r, login.AuthURL, http.StatusFound)
 }
 
@@ -73,12 +73,12 @@ func (h *Handler) CallbackLogin(w http.ResponseWriter, r *http.Request) {
 	h.clearCookie(w, oauthTxCookie)
 
 	if reason := q.Get("error"); reason != "" {
-		h.failLogin(w, r, reasonCancelled, errors.New("google: "+reason))
+		h.redirectLoginFailure(w, r, reasonCancelled, errors.New("google: "+reason))
 		return
 	}
 
 	if q.Get("code") == "" || q.Get("state") == "" {
-		h.failLogin(w, r, reasonLoginFailed, errors.New("callback missing code or state"))
+		h.redirectLoginFailure(w, r, reasonLoginFailed, errors.New("callback missing code or state"))
 		return
 	}
 
@@ -89,22 +89,22 @@ func (h *Handler) CallbackLogin(w http.ResponseWriter, r *http.Request) {
 	})
 	switch {
 	case errors.Is(err, ErrLoginRejected):
-		h.failLogin(w, r, reasonLoginFailed, err)
+		h.redirectLoginFailure(w, r, reasonLoginFailed, err)
 		return
 	case err != nil:
-		h.failLogin(w, r, reasonServerError, err)
+		h.redirectLoginFailure(w, r, reasonServerError, err)
 		return
 	}
 
 	csrfToken, err := common.RandomToken()
 	if err != nil {
-		h.failLogin(w, r, reasonServerError, err)
+		h.redirectLoginFailure(w, r, reasonServerError, err)
 		return
 	}
 
 	h.setSessionCookie(w, login.SessionID)
 	h.setCSRFCookie(w, csrfToken)
-	h.noStore(w)
+	h.setNoStoreHeader(w)
 
 	target := h.Config.AppBaseURL.Frontend
 	if login.IsNewUser {
@@ -113,15 +113,15 @@ func (h *Handler) CallbackLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, target, http.StatusFound)
 }
 
-// Me returns the signed-in user.
+// GetCurrentUser returns the signed-in user.
 //
 //	@Summary	Current user
 //	@Tags		auth
 //	@Produce	json
-//	@Success	200	{object}	config.SuccessResponse{data=auth.MeResponse}
+//	@Success	200	{object}	config.SuccessResponse{data=auth.CurrentUserResponse}
 //	@Failure	401	{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID | 40103 USER_NOT_IN_CONTEXT"
 //	@Router		/me [get]
-func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userID, ok := h.ExtractUserIDFromContext(ctx)
 	if !ok {
@@ -132,7 +132,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	user, err := h.service.GetUser(ctx, userID)
 	switch {
 	case errors.Is(err, ErrNoUser):
-		// Deleted after RequireSession passed; the cascade has already dropped the session.
+		// Deleted after RequireSession; the cascade dropped the session.
 		h.ReturnWithError(w, r, handler.Error(handler.CodeSessionInvalid, err))
 		return
 	case err != nil:
@@ -140,8 +140,8 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.noStore(w)
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Data: MeResponse{
+	h.setNoStoreHeader(w)
+	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Data: CurrentUserResponse{
 		User:        newUserResponse(&user.User),
 		Roles:       user.Roles,
 		Permissions: user.Permissions,
@@ -167,27 +167,24 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	h.clearCookie(w, sessionCookie)
 	h.clearCookie(w, csrfCookie)
-	h.noStore(w)
+	h.setNoStoreHeader(w)
 	h.ReturnWithJSON(w, http.StatusNoContent, nil)
 }
 
-func (h *Handler) failLogin(w http.ResponseWriter, r *http.Request, reason loginErrorReason, cause error) {
+func (h *Handler) redirectLoginFailure(w http.ResponseWriter, r *http.Request, reason loginErrorReason, cause error) {
 	slog.Warn("auth: login failed", "reason", reason, "err", cause)
 
-	h.noStore(w)
+	h.setNoStoreHeader(w)
 	target := h.Config.AppBaseURL.Frontend + "/login?" + url.Values{"error": {string(reason)}}.Encode()
 	http.Redirect(w, r, target, http.StatusFound)
 }
 
-func (h *Handler) noStore(w http.ResponseWriter) {
+func (h *Handler) setNoStoreHeader(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-store")
 }
 
-// AuthenticateSession lets middleware.RequireSession resolve a session without
-// reaching past the handler into the service, and without knowing about User:
-// it returns the context already carrying the user id.
 func (h *Handler) AuthenticateSession(ctx context.Context, sessionID string) (context.Context, error) {
-	userID, err := h.service.SessionUserID(ctx, sessionID)
+	userID, err := h.service.GetSessionUserID(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}

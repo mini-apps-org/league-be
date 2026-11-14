@@ -14,10 +14,6 @@ type User struct {
 	LastLoginAt   time.Time `db:"last_login_at"`
 }
 
-// UserWithAccess is a User plus the role and permission codes it holds, for the
-// SPA to show or hide routes and controls. A separate type rather than fields on
-// User: RowToStructByName needs a column for every field, and only
-// GetUserByID selects these.
 type UserWithAccess struct {
 	User
 	Roles       []string `db:"roles"`
