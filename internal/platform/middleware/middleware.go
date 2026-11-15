@@ -8,33 +8,36 @@ import (
 	"github.com/nguyentanvinh/league-be/internal/platform/handler"
 )
 
-// sessionAuthenticator is what RequireSession needs, stated as an interface so
-// this package depends on three methods rather than the whole auth handler —
-// and so a test can supply a fake without a database or a Google round trip.
-// AuthenticateSession returns the request context already carrying the user,
-// which keeps this package free of any import of auth.
-type sessionAuthenticator interface {
+type sessionHandler interface {
 	GetSessionCookie(r *http.Request) string
 	ClearSessionCookie(w http.ResponseWriter)
 	AuthenticateSession(ctx context.Context, sessionID string) (context.Context, error)
 }
 
-// Middleware holds every dependency the HTTP middlewares need, so the router
-// builds it once and each middleware is a method with the mux.MiddlewareFunc
-// signature.
-//
-// csrfCookieName is injected, not imported from auth: this package sits below
-// the feature packages.
-type Middleware struct {
-	handler.Handler
-	csrfCookieName string
-	sessions       sessionAuthenticator
+type permissionCodeReader interface {
+	GetPermissionCodesByUserID(ctx context.Context, userID string) ([]string, error)
 }
 
-func New(cfg *config.Config, csrfCookieName string, sessions sessionAuthenticator) *Middleware {
-	return &Middleware{
-		Handler:        handler.Handler{Config: cfg},
-		csrfCookieName: csrfCookieName,
-		sessions:       sessions,
+type Middleware interface {
+	SecurityHeaders(next http.Handler) http.Handler
+	HSTS(next http.Handler) http.Handler
+	RequireCSRF(next http.Handler) http.Handler
+	RequireSession(next http.Handler) http.Handler
+	RequirePermission(feature config.PermissionFeature, next http.Handler) http.Handler
+}
+
+type middleware struct {
+	handler.Handler
+	csrfCookieName    string
+	sessionHandler    sessionHandler
+	permissionService permissionCodeReader
+}
+
+func New(cfg *config.Config, csrfCookieName string, sessionHandler sessionHandler, permissionService permissionCodeReader) Middleware {
+	return &middleware{
+		Handler:           handler.Handler{Config: cfg},
+		csrfCookieName:    csrfCookieName,
+		sessionHandler:    sessionHandler,
+		permissionService: permissionService,
 	}
 }

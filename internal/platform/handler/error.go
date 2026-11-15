@@ -36,9 +36,15 @@ const (
 	CodeCSRFTokenMismatch ErrorCode = "40302"
 	// CodeForbidden is the unspecified 403.
 	CodeForbidden ErrorCode = "40304"
+	// CodePermissionDenied: the caller's roles lack the route's permission.
+	// Distinct from the CSRF 403s, which mean "reload the page".
+	CodePermissionDenied ErrorCode = "40305"
 
 	// 404
 	CodeNotFound ErrorCode = "40401"
+
+	// 409
+	CodeConflict ErrorCode = "40901"
 
 	// 429
 	CodeRateLimited ErrorCode = "42901"
@@ -67,8 +73,11 @@ var errorDetails = map[ErrorCode]errorDetail{
 	CodeCSRFCookieMissing: {"CSRF_COOKIE_ABSENT", "That request could not be completed. Reload the page and try again."},
 	CodeCSRFTokenMismatch: {"CSRF_TOKEN_MISMATCH", "That request could not be completed. Reload the page and try again."},
 	CodeForbidden:         {"FORBIDDEN", "That request could not be completed. Reload the page and try again."},
+	CodePermissionDenied:  {"PERMISSION_DENIED", "You do not have permission to do that."},
 
 	CodeNotFound: {"NOT_FOUND", "That item no longer exists."},
+
+	CodeConflict: {"CONFLICT", "That change conflicts with something that already exists."},
 
 	CodeRateLimited: {"RATE_LIMITED", "Too many requests. Wait a minute and try again."},
 

@@ -25,7 +25,7 @@ func isSafeMethod(method string) bool {
 
 // RequireCSRF enforces double-submit: the browser attaches the session cookie
 // even for a foreign page, so holding it proves nothing — reading it does.
-func (m *Middleware) RequireCSRF(next http.Handler) http.Handler {
+func (m *middleware) RequireCSRF(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isSafeMethod(r.Method) {
 			next.ServeHTTP(w, r)

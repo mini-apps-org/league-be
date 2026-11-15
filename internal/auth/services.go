@@ -17,10 +17,14 @@ import (
 // loginTxTTL bounds how long a user may sit on Google's consent screen.
 const loginTxTTL = 10 * time.Minute
 
+// signUpRoleCode is the role every new user gets; seeded by db/migrations/00001_init.sql.
+const signUpRoleCode = "PLAYER"
+
 type Service interface {
 	StartGoogleLogin(ctx context.Context) (LoginRedirect, error)
-	CompleteLogin(ctx context.Context, in CallbackInput) (LoginResult, error)
-	SessionUser(ctx context.Context, sessionID string) (*User, error)
+	CompleteLogin(ctx context.Context, input CallbackInput) (LoginResult, error)
+	GetSessionUserID(ctx context.Context, sessionID string) (string, error)
+	GetUser(ctx context.Context, id string) (*UserWithAccess, error)
 	Logout(ctx context.Context, sessionID string) error
 	StartSessionCleanup(ctx context.Context)
 }
@@ -76,21 +80,21 @@ func (s *service) StartGoogleLogin(ctx context.Context) (LoginRedirect, error) {
 // CompleteLogin refuses a forged or expired oauth_tx cookie, or a mismatched
 // state, before Google is contacted. Replay is stopped by Google's codes being
 // one-time, not by us.
-func (s *service) CompleteLogin(ctx context.Context, in CallbackInput) (LoginResult, error) {
-	if in.OAuthTx == "" {
+func (s *service) CompleteLogin(ctx context.Context, input CallbackInput) (LoginResult, error) {
+	if input.OAuthTx == "" {
 		return LoginResult{}, fmt.Errorf("%w: no oauth_tx cookie", ErrLoginRejected)
 	}
 
-	tx, err := openLoginTx(s.sealer, in.OAuthTx)
+	tx, err := openLoginTx(s.sealer, input.OAuthTx)
 	if err != nil {
 		return LoginResult{}, err
 	}
 
-	if subtle.ConstantTimeCompare([]byte(in.State), []byte(tx.State)) != 1 {
+	if subtle.ConstantTimeCompare([]byte(input.State), []byte(tx.State)) != 1 {
 		return LoginResult{}, fmt.Errorf("%w: state mismatch", ErrLoginRejected)
 	}
 
-	claims, err := s.google.Identify(ctx, in.Code, tx.CodeVerifier, tx.Nonce)
+	claims, err := s.google.Identify(ctx, input.Code, tx.CodeVerifier, tx.Nonce)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -102,7 +106,7 @@ func (s *service) CompleteLogin(ctx context.Context, in CallbackInput) (LoginRes
 		Name:          claims.Name,
 		AvatarURL:     claims.Picture,
 		HD:            claims.HD,
-	})
+	}, signUpRoleCode)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -114,32 +118,33 @@ func (s *service) CompleteLogin(ctx context.Context, in CallbackInput) (LoginRes
 		return LoginResult{}, err
 	}
 
-	if err := s.repo.CreateSession(ctx, Session{ID: sessionID, UserID: user.ID}); err != nil {
+	if err := s.repo.ReplaceSession(ctx, Session{ID: sessionID, UserID: user.ID}); err != nil {
 		return LoginResult{}, err
 	}
 
 	return LoginResult{SessionID: sessionID, IsNewUser: isNewUser, User: user}, nil
 }
 
-func (s *service) SessionUser(ctx context.Context, sessionID string) (*User, error) {
+// GetSessionUserID skips loading the user: user_id cascades on delete, so a live
+// session always points at an existing user.
+func (s *service) GetSessionUserID(ctx context.Context, sessionID string) (string, error) {
 	now := time.Now()
 
 	session, err := s.repo.GetSession(ctx, sessionID, now.Add(-s.sessionTTL), now.Add(-s.idleTTL))
 	if err != nil {
-		return nil, err
-	}
-
-	user, err := s.repo.GetUserByID(ctx, session.UserID)
-	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	// Extend the idle window on every read: the write is cheap, and skipping it
 	// would let an active session expire mid-use.
 	if err := s.repo.UpdateSessionLastSeenAt(ctx, sessionID); err != nil {
-		return nil, err
+		return "", err
 	}
-	return user, nil
+	return session.UserID, nil
+}
+
+func (s *service) GetUser(ctx context.Context, id string) (*UserWithAccess, error) {
+	return s.repo.GetUserByID(ctx, id)
 }
 
 func (s *service) Logout(ctx context.Context, sessionID string) error {

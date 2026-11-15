@@ -70,7 +70,7 @@ Retired codes (`40002`, `40303`) stay retired and are marked as such in the file
   `registerXRoute(api, ...)`, and wired from `NewRouter`. The feature's constructors
   (`NewRepo` → `NewService` → `NewHandler`) are assembled there and nowhere else.
 - Mounting under `PrefixAPIV1` gives you CSRF on every unsafe method for free. Auth is
-  opt-in per route: `mw.RequireSession(http.HandlerFunc(h.Me))`.
+  opt-in per route: `mw.RequireSession(http.HandlerFunc(h.GetCurrentUser))`.
 - Every handler carries swagger annotations — `@Summary`, `@Tags`, `@Success`, one
   `@Failure` per code it can return, `@Security CSRFToken` on unsafe methods, `@Router`.
 

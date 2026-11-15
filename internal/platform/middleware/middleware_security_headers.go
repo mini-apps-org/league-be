@@ -8,7 +8,7 @@ import (
 // SecurityHeaders sets the response headers that cost nothing and close off
 // whole attack classes. Deliberately not configurable: a header that can be
 // switched off per environment eventually is, where it was needed most.
-func (m *Middleware) SecurityHeaders(next http.Handler) http.Handler {
+func (m *middleware) SecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 
@@ -35,7 +35,7 @@ func (m *Middleware) SecurityHeaders(next http.Handler) http.Handler {
 // HSTS is separate from SecurityHeaders because it cannot be taken back for
 // max-age: sent from a host ever reached over https on a shared hostname, it
 // breaks that host. Wire it only in production.
-func (m *Middleware) HSTS(next http.Handler) http.Handler {
+func (m *middleware) HSTS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		next.ServeHTTP(w, r)

@@ -1,6 +1,6 @@
 package model
 
-type CursorReponse[T any] struct {
+type CursorResponse[T any] struct {
 	Items      []T
 	Total      int64
 	NextCursor *string

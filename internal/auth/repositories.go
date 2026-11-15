@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nguyentanvinh/league-be/internal/platform/handler/repo"
 )
 
 var (
@@ -18,10 +19,10 @@ var (
 const userColumns = "id, email, email_verified, name, avatar_url, created_at, last_login_at"
 
 type Repository interface {
-	UpsertGoogleIdentity(ctx context.Context, p GoogleIdentityParams) (*User, bool, error)
-	GetUserByID(ctx context.Context, id string) (*User, error)
+	UpsertGoogleIdentity(ctx context.Context, params GoogleIdentityParams, signUpRoleCode string) (*User, bool, error)
+	GetUserByID(ctx context.Context, id string) (*UserWithAccess, error)
 
-	CreateSession(ctx context.Context, s Session) error
+	ReplaceSession(ctx context.Context, session Session) error
 	GetSession(ctx context.Context, id string, absoluteCutoff, idleCutoff time.Time) (*Session, error)
 	UpdateSessionLastSeenAt(ctx context.Context, id string) error
 	DeleteSession(ctx context.Context, id string) error
@@ -37,55 +38,80 @@ func NewRepo(pool *pgxpool.Pool) Repository {
 	return &repository{pgPool: pool}
 }
 
-func (r *repository) UpsertGoogleIdentity(ctx context.Context, p GoogleIdentityParams) (*User, bool, error) {
+// UpsertGoogleIdentity grants signUpRoleCode in the same statement that inserts
+// a new user, so a user can never exist without it.
+func (r *repository) UpsertGoogleIdentity(ctx context.Context, params GoogleIdentityParams, signUpRoleCode string) (*User, bool, error) {
 	const query = `
-INSERT INTO users (google_sub, email, email_verified, name, avatar_url, hd)
-VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (google_sub) DO UPDATE SET
-    email          = $2,
-    email_verified = $3,
-    name           = $4,
-    avatar_url     = $5,
-    hd             = $6,
-    last_login_at  = now()
-RETURNING ` + userColumns + `, (xmax = 0) AS is_new_user`
+WITH upserted AS (
+    INSERT INTO users (google_sub, email, email_verified, name, avatar_url, hd)
+    VALUES ($1, $2, $3, $4, $5, $6)
+    ON CONFLICT (google_sub) DO UPDATE SET
+        email          = $2,
+        email_verified = $3,
+        name           = $4,
+        avatar_url     = $5,
+        hd             = $6,
+        last_login_at  = now()
+    RETURNING ` + userColumns + `, (xmax = 0) AS is_new_user
+), sign_up_role AS (
+    INSERT INTO users_roles (user_id, role_id)
+    SELECT upserted.id, roles.id
+    FROM upserted
+    JOIN roles ON roles.code = $7
+    WHERE upserted.is_new_user
+    ON CONFLICT (user_id, role_id) DO NOTHING
+)
+SELECT ` + userColumns + `, is_new_user FROM upserted`
 	args := []any{
-		p.Subject,       // $1 google_sub
-		p.Email,         // $2 email
-		p.EmailVerified, // $3 email_verified
-		p.Name,          // $4 name
-		p.AvatarURL,     // $5 avatar_url
-		p.HD,            // $6 hd
+		params.Subject,       // $1 google_sub
+		params.Email,         // $2 email
+		params.EmailVerified, // $3 email_verified
+		params.Name,          // $4 name
+		params.AvatarURL,     // $5 avatar_url
+		params.HD,            // $6 hd
+		signUpRoleCode,       // $7 roles.code granted on sign-up
 	}
 
 	// Scanned explicitly: is_new_user has no field on User, so RowToStructByName
 	// would reject the extra column. Keep this list in userColumns order.
-	var u User
+	var user User
 	var isNewUser bool
 	err := r.pgPool.QueryRow(ctx, query, args...).Scan(
-		&u.ID,            // id
-		&u.Email,         // email
-		&u.EmailVerified, // email_verified
-		&u.Name,          // name
-		&u.AvatarURL,     // avatar_url
-		&u.CreatedAt,     // created_at
-		&u.LastLoginAt,   // last_login_at
-		&isNewUser,       // (xmax = 0)
+		&user.ID,            // id
+		&user.Email,         // email
+		&user.EmailVerified, // email_verified
+		&user.Name,          // name
+		&user.AvatarURL,     // avatar_url
+		&user.CreatedAt,     // created_at
+		&user.LastLoginAt,   // last_login_at
+		&isNewUser,          // (xmax = 0)
 	)
 	if err != nil {
 		return nil, false, fmt.Errorf("auth: upsert google user: %w", err)
 	}
 
-	return &u, isNewUser, nil
+	return &user, isNewUser, nil
 }
 
-func (r *repository) GetUserByID(ctx context.Context, id string) (*User, error) {
-	const query = `SELECT ` + userColumns + ` FROM users WHERE id = $1`
+func (r *repository) GetUserByID(ctx context.Context, id string) (*UserWithAccess, error) {
+	const query = `
+SELECT ` + userColumns + `,
+	COALESCE((SELECT array_agg(ro.code ORDER BY ro.code)
+	          FROM users_roles ur
+	          JOIN roles ro ON ro.id = ur.role_id
+	          WHERE ur.user_id = users.id), '{}') AS roles,
+	COALESCE((SELECT array_agg(DISTINCT p.code ORDER BY p.code)
+	          FROM users_roles ur
+	          JOIN roles_permissions rp ON rp.role_id = ur.role_id
+	          JOIN permissions p        ON p.id = rp.permission_id
+	          WHERE ur.user_id = users.id), '{}') AS permissions
+FROM users
+WHERE id = $1`
 	args := []any{
 		id,
 	}
 
-	user, err := queryOne[User](ctx, r.pgPool, query, args...)
+	user, err := repo.QueryOne[UserWithAccess](ctx, r.pgPool, query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNoUser
 	}
@@ -95,15 +121,22 @@ func (r *repository) GetUserByID(ctx context.Context, id string) (*User, error) 
 	return user, nil
 }
 
-func (r *repository) CreateSession(ctx context.Context, s Session) error {
-	const query = `INSERT INTO users_sessions (id, user_id) VALUES ($1, $2)`
+// ReplaceSession keeps one session per user: a new sign-in atomically
+// overwrites the previous row, so its sid stops resolving.
+func (r *repository) ReplaceSession(ctx context.Context, session Session) error {
+	const query = `
+INSERT INTO users_sessions (id, user_id) VALUES ($1, $2)
+ON CONFLICT (user_id) DO UPDATE SET
+    id           = EXCLUDED.id,
+    created_at   = now(),
+    last_seen_at = now()`
 	args := []any{
-		s.ID,     // $1 id
-		s.UserID, // $2 user_id
+		session.ID,     // $1 id
+		session.UserID, // $2 user_id
 	}
 
 	if _, err := r.pgPool.Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("auth: create session: %w", err)
+		return fmt.Errorf("auth: replace session: %w", err)
 	}
 	return nil
 }
@@ -119,7 +152,7 @@ WHERE id = $1 AND created_at > $2 AND last_seen_at > $3`
 		idleCutoff,     // $3 last_seen_at floor
 	}
 
-	session, err := queryOne[Session](ctx, r.pgPool, query, args...)
+	session, err := repo.QueryOne[Session](ctx, r.pgPool, query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNoSession
 	}
@@ -177,19 +210,4 @@ func (r *repository) DeleteExpiredSessions(ctx context.Context, absoluteCutoff, 
 		return 0, fmt.Errorf("auth: delete expired sessions: %w", err)
 	}
 	return tag.RowsAffected(), nil
-}
-
-// queryOne maps one row onto T by column name. It returns the raw error so a
-// caller can match pgx.ErrNoRows; wrapping is the caller's job.
-func queryOne[T any](ctx context.Context, pool *pgxpool.Pool, query string, args ...any) (*T, error) {
-	rows, err := pool.Query(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[T])
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
 }
