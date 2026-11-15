@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/mini-apps-org/league-be/releases/tag/0.5.0) - 2026-11-15
+
+- [#PR4](https://github.com/mini-apps-org/league-be/pull/PR4)
+  - feat(authorization): seed role `PLAYER` for new user
+  - fix(golangci-lint): ignore lint `S1016`
+  - docs(claude): naming convention rule
+  - refactor: clearer names and leaner comments in committed code
+  - feat(roles-permissions): RBAC `roles/permissions` catalog and permission middleware
+  - feat(auth): one session per user (`ReplaceSession`)
+  - feat(authorization): add `roles/permissions` when get user info
+  - refactor(database): share pgx query helpers in `platform/handler/repo`
+
 ## [0.4.0](https://github.com/mini-apps-org/league-be/releases/tag/0.4.0) - 2026-11-12
 
 - refactor(middleware): re-structure middleware and add `go vet` in ci/cd pipeline
