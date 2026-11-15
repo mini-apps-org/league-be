@@ -72,7 +72,7 @@ const docTemplate = `{
                         "CSRFToken": []
                     }
                 ],
-                "description": "Deletes the session row and clears the sid + csrf cookies. Other devices stay signed in.",
+                "description": "Deletes the session row and clears the sid + csrf cookies. A user has one session, so this signs them out everywhere.",
                 "produces": [
                     "application/json"
                 ],

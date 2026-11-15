@@ -296,7 +296,7 @@ Go, because a session id must come from a CSPRNG the application controls.
 
 | Repository method | SQL |
 |---|---|
-| `UpsertGoogleIdentity` | `INSERT … ON CONFLICT (google_sub) DO UPDATE … RETURNING …, (xmax = 0)` — one round trip; `xmax = 0` means this statement inserted the row, i.e. a sign-up |
+| `UpsertGoogleIdentity` | `INSERT … ON CONFLICT (google_sub) DO UPDATE … RETURNING …, (xmax = 0)` — one round trip; `xmax = 0` means this statement inserted the row, i.e. a sign-up, and a CTE grants `PLAYER` in that same statement |
 | `GetUserByID` | `SELECT … WHERE id = $1` |
 | `CreateSession` | `INSERT INTO users_sessions …` |
 | `GetSession` | `SELECT … WHERE id = $1 AND created_at > $2 AND last_seen_at > $3` — both TTLs |

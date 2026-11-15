@@ -19,7 +19,7 @@ var (
 const userColumns = "id, email, email_verified, name, avatar_url, created_at, last_login_at"
 
 type Repository interface {
-	UpsertGoogleIdentity(ctx context.Context, params GoogleIdentityParams) (*User, bool, error)
+	UpsertGoogleIdentity(ctx context.Context, params GoogleIdentityParams, signUpRoleCode string) (*User, bool, error)
 	GetUserByID(ctx context.Context, id string) (*UserWithAccess, error)
 
 	ReplaceSession(ctx context.Context, session Session) error
@@ -38,18 +38,30 @@ func NewRepo(pool *pgxpool.Pool) Repository {
 	return &repository{pgPool: pool}
 }
 
-func (r *repository) UpsertGoogleIdentity(ctx context.Context, params GoogleIdentityParams) (*User, bool, error) {
+// UpsertGoogleIdentity grants signUpRoleCode in the same statement that inserts
+// a new user, so a user can never exist without it.
+func (r *repository) UpsertGoogleIdentity(ctx context.Context, params GoogleIdentityParams, signUpRoleCode string) (*User, bool, error) {
 	const query = `
-INSERT INTO users (google_sub, email, email_verified, name, avatar_url, hd)
-VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (google_sub) DO UPDATE SET
-    email          = $2,
-    email_verified = $3,
-    name           = $4,
-    avatar_url     = $5,
-    hd             = $6,
-    last_login_at  = now()
-RETURNING ` + userColumns + `, (xmax = 0) AS is_new_user`
+WITH upserted AS (
+    INSERT INTO users (google_sub, email, email_verified, name, avatar_url, hd)
+    VALUES ($1, $2, $3, $4, $5, $6)
+    ON CONFLICT (google_sub) DO UPDATE SET
+        email          = $2,
+        email_verified = $3,
+        name           = $4,
+        avatar_url     = $5,
+        hd             = $6,
+        last_login_at  = now()
+    RETURNING ` + userColumns + `, (xmax = 0) AS is_new_user
+), sign_up_role AS (
+    INSERT INTO users_roles (user_id, role_id)
+    SELECT upserted.id, roles.id
+    FROM upserted
+    JOIN roles ON roles.code = $7
+    WHERE upserted.is_new_user
+    ON CONFLICT (user_id, role_id) DO NOTHING
+)
+SELECT ` + userColumns + `, is_new_user FROM upserted`
 	args := []any{
 		params.Subject,       // $1 google_sub
 		params.Email,         // $2 email
@@ -57,6 +69,7 @@ RETURNING ` + userColumns + `, (xmax = 0) AS is_new_user`
 		params.Name,          // $4 name
 		params.AvatarURL,     // $5 avatar_url
 		params.HD,            // $6 hd
+		signUpRoleCode,       // $7 roles.code granted on sign-up
 	}
 
 	// Scanned explicitly: is_new_user has no field on User, so RowToStructByName

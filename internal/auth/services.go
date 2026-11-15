@@ -17,6 +17,9 @@ import (
 // loginTxTTL bounds how long a user may sit on Google's consent screen.
 const loginTxTTL = 10 * time.Minute
 
+// signUpRoleCode is the role every new user gets; seeded by db/migrations/00001_init.sql.
+const signUpRoleCode = "PLAYER"
+
 type Service interface {
 	StartGoogleLogin(ctx context.Context) (LoginRedirect, error)
 	CompleteLogin(ctx context.Context, input CallbackInput) (LoginResult, error)
@@ -103,7 +106,7 @@ func (s *service) CompleteLogin(ctx context.Context, input CallbackInput) (Login
 		Name:          claims.Name,
 		AvatarURL:     claims.Picture,
 		HD:            claims.HD,
-	})
+	}, signUpRoleCode)
 	if err != nil {
 		return LoginResult{}, err
 	}

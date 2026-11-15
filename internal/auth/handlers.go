@@ -151,7 +151,7 @@ func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 // Logout revokes this session.
 //
 //	@Summary		Sign out
-//	@Description	Deletes the session row and clears the sid + csrf cookies. Other devices stay signed in.
+//	@Description	Deletes the session row and clears the sid + csrf cookies. A user has one session, so this signs them out everywhere.
 //	@Tags			auth
 //	@Produce		json
 //	@Success		204	"signed out"
