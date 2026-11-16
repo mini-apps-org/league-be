@@ -10,6 +10,7 @@ import (
 	"github.com/nguyentanvinh/league-be/internal/permissions"
 	"github.com/nguyentanvinh/league-be/internal/platform/config"
 	"github.com/nguyentanvinh/league-be/internal/platform/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
@@ -51,6 +52,8 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 	r.registerHealthRoute(api)
 	registerAuthRoute(api, authHandler, mw)
 	r.registerRoleRoute(api, mw, permissionService)
+
+	router.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
 
 	return router, nil
 }
