@@ -1,0 +1,3 @@
+text: |
+  :x: *${{ env.IMAGE_NAME }} ${{ env.RELEASE_TAG }}* release failed (verify: ${{ env.VERIFY_RESULT }}, build-and-push: ${{ env.BUILD_RESULT }})
+  <${{ env.RUN_URL }}|View run>

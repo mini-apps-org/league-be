@@ -212,6 +212,11 @@ asia-southeast1-docker.pkg.dev/vincent-mini-apps-project/league-repository/leagu
 `latest` is deliberately never written (`flavor: latest=false`), so nothing can roll
 forward by accident.
 
+The last job, `notify`, posts the outcome to Slack: on success the image as
+`…/league-service:0.3.1@sha256:…`, or which job failed. The message text lives in
+`.github/slack/release-{success,failure}.yaml`. It reads the Incoming Webhook URL from the repository secret
+`SLACK_WEBHOOK_URL`; without it the job fails, and the image is still pushed.
+
 ### Verify what is actually running
 
 The tag is stamped into the binary at link time (`-ldflags -X …config.buildImage`) and read

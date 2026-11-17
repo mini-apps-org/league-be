@@ -1,0 +1,4 @@
+text: |
+  :white_check_mark: *${{ env.IMAGE_NAME }} ${{ env.RELEASE_TAG }}* pushed to Artifact Registry
+  `${{ env.IMAGE }}@${{ env.DIGEST }}`
+  <${{ env.RUN_URL }}|View run>
