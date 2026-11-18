@@ -1,7 +1,7 @@
 # Changelog
 
-## [TBD](https://github.com/mini-apps-org/league-be/releases/tag/TBD) - 2026-11-XX
-- [#TBD](https://github.com/mini-apps-org/league-be/pull/TBD)
+## [0.6.0](https://github.com/mini-apps-org/league-be/releases/tag/TBD) - 2026-11-18
+- [#PR5](https://github.com/mini-apps-org/league-be/pull/PR5)
   - feat(trace): add trace id for server
 
 ## [0.5.0](https://github.com/mini-apps-org/league-be/releases/tag/0.5.0) - 2026-11-15
