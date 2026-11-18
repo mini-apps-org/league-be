@@ -1,4 +1,24 @@
 text: |
-  :white_check_mark: *${{ env.IMAGE_NAME }} ${{ env.RELEASE_TAG }}* pushed to Artifact Registry
-  `${{ env.IMAGE }}@${{ env.DIGEST }}`
-  <${{ env.RUN_URL }}|View run>
+  :white_check_mark: Image ${{ env.IMAGE_NAME }} ${{ env.RELEASE_TAG }} has been successfully pushed to Artifact Registry at ${{ env.FINISHED_AT }}.
+  Workflow run details are available at: ${{ env.RUN_URL }} .
+attachments:
+  - color: "#18be52"
+    title: "${{ env.IMAGE_NAME }}"
+    title_link: "${{ env.RUN_URL }}"
+    mrkdwn_in: [fields]
+    fields:
+      - title: Build Status
+        value: Succeeded
+        short: true
+      - title: Repository
+        value: "${{ env.REPOSITORY_URL }}"
+        short: true
+      - title: Tag
+        value: "${{ env.RELEASE_TAG }}"
+        short: true
+      - title: Commit
+        value: "<${{ env.REPOSITORY_URL }}/commit/${{ env.COMMIT_SHA }}|${{ env.COMMIT_SHA }}>"
+        short: true
+      - title: Image
+        value: "`${{ env.IMAGE }}@${{ env.DIGEST }}`"
+        short: false

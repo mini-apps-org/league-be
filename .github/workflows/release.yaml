@@ -123,12 +123,17 @@ jobs:
         with:
           sparse-checkout: .github/slack
 
+      - name: Record Finish Time
+        run: echo "FINISHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       # The action only substitutes ${{ env.* }} and ${{ github.* }} in a
       # payload file, so every value the templates need is passed as env.
       - name: Post to Slack
         uses: slackapi/slack-github-action@b0fa283ad8fea605de13dc3f449259339835fc52 # v2.1.0
         env:
           RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
           IMAGE: ${{ needs.build-and-push.outputs.image }}
           DIGEST: ${{ needs.build-and-push.outputs.digest }}
           VERIFY_RESULT: ${{ needs.verify.result }}
