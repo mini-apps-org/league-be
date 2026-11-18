@@ -10,8 +10,12 @@ type SuccessResponse struct {
 type ContextKey string
 
 const (
-	ContextKeyRequestID ContextKey = "request-id"
-	ContextKeyUserID    ContextKey = "user-id"
+	ContextKeyRequestID ContextKey = "request_id"
+	ContextKeyUserID    ContextKey = "user_id"
 )
 
-var AllowHeadersAPI = []string{"Accept", "Content-Type", "Origin", "X-CSRF-Token"}
+const HeaderRequestID = "X-Request-Id"
+
+var AllowHeadersAPI = []string{"Accept", "Content-Type", "Origin", "X-CSRF-Token", HeaderRequestID}
+
+var ExposeHeadersAPI = []string{HeaderRequestID}

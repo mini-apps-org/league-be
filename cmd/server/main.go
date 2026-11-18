@@ -66,6 +66,7 @@ func main() {
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   cfg.Domains.AllowedOrigins,
 		AllowedHeaders:   config.AllowHeadersAPI,
+		ExposedHeaders:   config.ExposeHeadersAPI,
 		AllowCredentials: true,
 		AllowedMethods: []string{
 			http.MethodGet,

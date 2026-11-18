@@ -172,7 +172,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) redirectLoginFailure(w http.ResponseWriter, r *http.Request, reason loginErrorReason, cause error) {
-	slog.Warn("auth: login failed", "reason", reason, "err", cause)
+	slog.WarnContext(r.Context(), "auth: login failed", "reason", reason, "err", cause)
 
 	h.setNoStoreHeader(w)
 	target := h.Config.AppBaseURL.Frontend + "/login?" + url.Values{"error": {string(reason)}}.Encode()
