@@ -37,6 +37,7 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 	mw := middleware.New(r.Config, auth.CSRFCookieName(r.Config), authHandler, permissionService)
 
 	router := mux.NewRouter()
+	router.Use(mw.Trace)
 	router.Use(mw.SecurityHeaders)
 
 	if r.Config.IsProduction() {

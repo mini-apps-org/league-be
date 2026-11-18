@@ -4,11 +4,14 @@ package logger
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
+
+	"github.com/nguyentanvinh/league-be/internal/platform/config"
 )
 
 const envDevelopment = "development"
@@ -28,7 +31,31 @@ func newHandler(w io.Writer, env, level string) (slog.Handler, error) {
 		w = indentJSON{w: w}
 	}
 
-	return slog.NewJSONHandler(w, &slog.HandlerOptions{Level: resolved}), err
+	return requestIDHandler{Handler: slog.NewJSONHandler(w, &slog.HandlerOptions{Level: resolved})}, err
+}
+
+// requestIDHandler stamps request_id onto every record logged with a request
+// context (slog.InfoContext, slog.LogAttrs(ctx, ...)), so handler, service and
+// repository lines of one request can be joined without passing the ID around.
+// WithAttrs and WithGroup re-wrap so a derived logger keeps the stamp.
+type requestIDHandler struct {
+	slog.Handler
+}
+
+func (h requestIDHandler) Handle(ctx context.Context, record slog.Record) error {
+	if requestID, ok := ctx.Value(config.ContextKeyRequestID).(string); ok && requestID != "" {
+		record.AddAttrs(slog.String("request_id", requestID))
+	}
+
+	return h.Handler.Handle(ctx, record)
+}
+
+func (h requestIDHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return requestIDHandler{Handler: h.Handler.WithAttrs(attrs)}
+}
+
+func (h requestIDHandler) WithGroup(name string) slog.Handler {
+	return requestIDHandler{Handler: h.Handler.WithGroup(name)}
 }
 
 // indentJSON re-indents each record. An io.Writer rather than a slog.Handler
