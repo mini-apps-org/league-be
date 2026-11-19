@@ -1,6 +1,14 @@
 # Changelog
 
+## [0.7.0](https://github.com/mini-apps-org/league-be/releases/tag/0.7.0) - 2026-11-19
+
+- [#PR6](https://github.com/mini-apps-org/league-be/pull/PR6)
+  - docs: service overview diagrams
+  - feat(metrics): HTTP request metrics middleware
+  - feat(metrics): serve /metrics on its own port and read server timeouts from config
+
 ## [0.6.0](https://github.com/mini-apps-org/league-be/releases/tag/TBD) - 2026-11-18
+
 - [#PR5](https://github.com/mini-apps-org/league-be/pull/PR5)
   - feat(trace): add trace id for server
 
