@@ -38,6 +38,8 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 
 	router := mux.NewRouter()
 	router.Use(mw.Trace)
+	// Before CSRF, session and permission checks, so their rejections are counted.
+	router.Use(mw.RecordRequestMetrics)
 	router.Use(mw.SecurityHeaders)
 
 	if r.Config.IsProduction() {
@@ -54,9 +56,14 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 	registerAuthRoute(api, authHandler, mw)
 	r.registerRoleRoute(api, mw, permissionService)
 
-	router.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
-
 	return router, nil
+}
+
+// NewMetricsRouter serves /metrics alone, for a listener separate from the API.
+func NewMetricsRouter() *mux.Router {
+	router := mux.NewRouter()
+	router.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
+	return router
 }
 
 func handleSwagger(router *mux.Router) {

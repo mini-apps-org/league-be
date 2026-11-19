@@ -78,14 +78,19 @@ func main() {
 		},
 	})
 
-	// TODO vincent: take these from cfg.Server once those fields are wired.
 	server := &http.Server{
 		Addr:              cfg.ServerPort(),
 		Handler:           corsHandler.Handler(routes),
+		ReadHeaderTimeout: cfg.ServerReadHeaderTimeout(),
+		ReadTimeout:       cfg.ServerReadTimeout(),
+		WriteTimeout:      cfg.ServerWriteTimeout(),
+		IdleTimeout:       cfg.ServerIdleTimeout(),
+	}
+
+	metricsServer := &http.Server{
+		Addr:              cfg.MetricsServerPort(),
+		Handler:           router.NewMetricsRouter(),
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      90 * time.Second,
-		IdleTimeout:       120 * time.Second,
 	}
 
 	go func() {
@@ -96,12 +101,23 @@ func main() {
 		}
 	}()
 
+	go func() {
+		slog.Info("metrics server: listening", "addr", cfg.MetricsServerPort())
+		if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("metrics server: listen failed", "err", err)
+			os.Exit(1)
+		}
+	}()
+
 	<-ctx.Done()
 	slog.Info("server: shutting down")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.GracefulShutdownTimeout())
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		slog.Error("server: shutdown failed", "err", err)
+	}
+	if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+		slog.Error("metrics server: shutdown failed", "err", err)
 	}
 }

@@ -3,6 +3,7 @@ logger:
 
 server:
   port: 5001
+  metrics_port: 9091
   graceful_shutdown_in_second: 5
   read_header_timeout_in_second: 10
   read_timeout_in_second: 10
