@@ -19,6 +19,7 @@ type Config struct {
 	} `mapstructure:"logger"`
 	Server struct {
 		Port                      string `mapstructure:"port"`
+		MetricsPort               string `mapstructure:"metrics_port"`
 		GracefulShutdownInSecond  int    `mapstructure:"graceful_shutdown_in_second"`
 		ReadTimeoutInSecond       int    `mapstructure:"read_timeout_in_second"`
 		ReadHeaderTimeoutInSecond int    `mapstructure:"read_header_timeout_in_second"`
@@ -99,6 +100,32 @@ func (c *Config) IsProduction() bool {
 // ServerPort is the address the HTTP server listens on.
 func (c *Config) ServerPort() string {
 	return ":" + c.Server.Port
+}
+
+// MetricsServerPort is the address /metrics listens on. It is kept off the API
+// port so the Service, and therefore the public Ingress, never exposes it.
+func (c *Config) MetricsServerPort() string {
+	return ":" + c.Server.MetricsPort
+}
+
+func (c *Config) ServerReadHeaderTimeout() time.Duration {
+	return time.Duration(c.Server.ReadHeaderTimeoutInSecond) * time.Second
+}
+
+func (c *Config) ServerReadTimeout() time.Duration {
+	return time.Duration(c.Server.ReadTimeoutInSecond) * time.Second
+}
+
+func (c *Config) ServerWriteTimeout() time.Duration {
+	return time.Duration(c.Server.WriteTimeoutInSecond) * time.Second
+}
+
+func (c *Config) ServerIdleTimeout() time.Duration {
+	return time.Duration(c.Server.IdleTimeoutInSecond) * time.Second
+}
+
+func (c *Config) GracefulShutdownTimeout() time.Duration {
+	return time.Duration(c.Server.GracefulShutdownInSecond) * time.Second
 }
 
 func (c *Config) ConnectDatabaseString() string {

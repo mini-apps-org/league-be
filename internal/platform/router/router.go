@@ -54,9 +54,14 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 	registerAuthRoute(api, authHandler, mw)
 	r.registerRoleRoute(api, mw, permissionService)
 
-	router.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
-
 	return router, nil
+}
+
+// NewMetricsRouter serves /metrics alone, for a listener separate from the API.
+func NewMetricsRouter() *mux.Router {
+	router := mux.NewRouter()
+	router.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
+	return router
 }
 
 func handleSwagger(router *mux.Router) {

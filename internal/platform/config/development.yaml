@@ -3,9 +3,12 @@ logger:
 
 server:
   port: 9200
+  metrics_port: 9091
   graceful_shutdown_in_second: 5
+  read_header_timeout_in_second: 10
   read_timeout_in_second: 10
   write_timeout_in_second: 100
+  idle_timeout_in_second: 120
 
 # Pool sizing and lifetimes only. Host, name, credentials and sslmode are
 # secrets or per-machine values, so they come from the environment instead.

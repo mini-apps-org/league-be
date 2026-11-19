@@ -47,6 +47,9 @@ func Load() (*Config, error) {
 	if port := os.Getenv("PORT"); port != "" {
 		config.Server.Port = strings.TrimPrefix(port, ":")
 	}
+	if metricsPort := os.Getenv("METRICS_PORT"); metricsPort != "" {
+		config.Server.MetricsPort = strings.TrimPrefix(metricsPort, ":")
+	}
 
 	config.Logger.Level = envOr("LOG_LEVEL", config.Logger.Level)
 	config.Database.URL = os.Getenv("DATABASE_URL")
@@ -99,6 +102,27 @@ func Load() (*Config, error) {
 	// fail open.
 	if len(config.Domains.AllowedOrigins) == 0 {
 		return nil, fmt.Errorf("config: domains.allowed_origins must list at least one origin")
+	}
+
+	// An empty port makes the listener pick a random one, which nothing scrapes.
+	// Sharing the API port would put /metrics back behind the public Ingress.
+	if config.Server.MetricsPort == "" || config.Server.MetricsPort == config.Server.Port {
+		return nil, fmt.Errorf("config: server.metrics_port (%q) must be set and differ from server.port (%q)",
+			config.Server.MetricsPort, config.Server.Port)
+	}
+
+	// net/http reads a zero timeout as "never time out", so a key missing from
+	// the YAML would silently leave the server open to slow clients.
+	for name, seconds := range map[string]int{
+		"server.graceful_shutdown_in_second":   config.Server.GracefulShutdownInSecond,
+		"server.read_header_timeout_in_second": config.Server.ReadHeaderTimeoutInSecond,
+		"server.read_timeout_in_second":        config.Server.ReadTimeoutInSecond,
+		"server.write_timeout_in_second":       config.Server.WriteTimeoutInSecond,
+		"server.idle_timeout_in_second":        config.Server.IdleTimeoutInSecond,
+	} {
+		if seconds <= 0 {
+			return nil, fmt.Errorf("config: %s must be greater than 0, got %d", name, seconds)
+		}
 	}
 
 	return config, nil
