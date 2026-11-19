@@ -38,6 +38,8 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 
 	router := mux.NewRouter()
 	router.Use(mw.Trace)
+	// Before CSRF, session and permission checks, so their rejections are counted.
+	router.Use(mw.RecordRequestMetrics)
 	router.Use(mw.SecurityHeaders)
 
 	if r.Config.IsProduction() {

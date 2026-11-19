@@ -20,6 +20,7 @@ type permissionCodeReader interface {
 
 type Middleware interface {
 	Trace(next http.Handler) http.Handler
+	RecordRequestMetrics(next http.Handler) http.Handler
 	SecurityHeaders(next http.Handler) http.Handler
 	HSTS(next http.Handler) http.Handler
 	RequireCSRF(next http.Handler) http.Handler
