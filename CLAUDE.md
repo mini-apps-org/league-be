@@ -2,6 +2,8 @@
 
 ## Documentation
 
+- `docs/overview.md` — the service from the outside: what it talks to, the request
+  pipeline, startup and shutdown, and the release path, as Mermaid diagrams.
 - `docs/architecture.md` — the layering: handler → service → repository → database,
   the boundary types, the request traces and the composition root. Read it before
   adding a feature slice.
