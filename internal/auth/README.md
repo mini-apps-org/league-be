@@ -263,7 +263,7 @@ able to read this origin's cookies, which a cross-site page cannot do.
 
 ## 6. Database
 
-`db/migrations/00001_init.sql` is the whole schema for the service — these two tables are the auth
+`db/migrations/000001-init.sql` is the whole schema for the service — these two tables are the auth
 slice of it; everything else (leagues, divisions, teams, matches, roles) belongs to other packages.
 
 ```sql

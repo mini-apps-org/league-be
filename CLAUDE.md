@@ -7,6 +7,10 @@
 - `docs/architecture.md` — the layering: handler → service → repository → database,
   the boundary types, the request traces and the composition root. Read it before
   adding a feature slice.
+- `docs/data-model.md` — accounts, members (players) and teams: how they relate across
+  divisions and seasons, the ID formats, and who may change a roster.
+- `docs/local-testing.md` — running the API on localhost and calling it: `.env`, the
+  database, Google sign-in, granting yourself a role, Postman and curl, error codes.
 - `docs/workflow.md` — package layout, errors, HTTP, config, migrations and tests,
   then the step-by-step path from a feature branch to a deployed image.
 
@@ -17,6 +21,9 @@ speaks SQL — follow @.claude/rules/database.md
 
 When naming any function, method, type, constant or variable, follow
 @.claude/rules/naming.md
+
+When changing the database schema — `db/migrations/000001-init.sql` or a file under
+`db/migrations/<year>/` — follow @.claude/rules/migrations.md
 
 ## CodeGraph — preferred search tool
 

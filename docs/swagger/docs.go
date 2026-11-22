@@ -527,6 +527,782 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/teams": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "List teams",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "only teams entered in this division (uuid)",
+                        "name": "division_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/teams.TeamResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "40001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "40305 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "` + "`" + `division_id` + "`" + ` is required: a team is created in a division. ` + "`" + `team_code` + "`" + ` is the team code XXyyA (region, host location, team sequence), unique within the division; lower case is accepted and stored upper case. The team then enters a division with POST /teams/{id}/divisions, and the captain is set with PATCH once the player is on the roster.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Create a team",
+                "parameters": [
+                    {
+                        "description": "team to create",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/teams.CreateTeamRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/teams.TeamResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "40001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "40901 CONFLICT (team_code taken)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/teams-roster/{id}": {
+            "get": {
+                "description": "Active players only, with their stats in the division (zero before the first match).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rosters"
+                ],
+                "summary": "List a team's roster in a division",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "team id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "division id (uuid)",
+                        "name": "division_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/teams.RosterPlayerResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "40001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "40401 NOT_FOUND (team has not entered the division)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "A player can be on only one active roster per division, and the team must have entered the division.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rosters"
+                ],
+                "summary": "Add a player to a team's roster in a division",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "team id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "division id (uuid)",
+                        "name": "division_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "player to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/teams.AddRosterPlayerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/teams.RosterPlayerResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "40001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "40305 PERMISSION_DENIED (not the team captain, or an unpaid member)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "40401 NOT_FOUND (player, or team has not entered the division)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "40901 CONFLICT (already on a roster in the division)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/teams-roster/{id}/{player_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Closes the roster entry rather than deleting it, so match history keeps the player's team. The team captain cannot be removed.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rosters"
+                ],
+                "summary": "Remove a player from a team's roster in a division",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "team id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "player id (uuid)",
+                        "name": "player_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "division id (uuid)",
+                        "name": "division_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "removed"
+                    },
+                    "400": {
+                        "description": "40001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "40305 PERMISSION_DENIED (not the team captain, or an unpaid member)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "40401 NOT_FOUND (team or roster entry)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "40901 CONFLICT (captain)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Closes the player's roster entry and opens one on ` + "`" + `team_id` + "`" + `, in ` + "`" + `division_id` + "`" + ` or the current division when absent, in one transaction. The team captain cannot be transferred.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rosters"
+                ],
+                "summary": "Transfer a player to another team",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current team id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "player id (uuid)",
+                        "name": "player_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current division id (uuid)",
+                        "name": "division_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "target team and division",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/teams.TransferRosterPlayerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/teams.RosterPlayerResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "40001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "40305 PERMISSION_DENIED (not the team captain, or an unpaid member)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "40401 NOT_FOUND (team, roster entry, or target team has not entered the division)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "40901 CONFLICT (captain, or already on a roster in the target division)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/teams/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Get a team",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "team id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/teams.TeamResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "40001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "40401 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Soft delete: the team is hidden and its active roster entries are closed, freeing its players. Fixtures, division entries, roster history and its team_code are kept until DELETE /teams/{id}/permanent.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Delete a team",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "team id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "deleted"
+                    },
+                    "404": {
+                        "description": "40401 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Partial update: an absent field is left unchanged. ` + "`" + `captain_player_id` + "`" + ` must be on the team's active roster in some division.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Update a team",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "team id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/teams.UpdateTeamRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/teams.TeamResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "40001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "40401 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "40901 CONFLICT (team_code taken)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/teams/{id}/divisions": {
+            "post": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "How a permanent team plays a season: one entry per division.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Enter a team into a division",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "team id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "division to enter",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/teams.AddDivisionTeamRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/teams.DivisionTeamResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "40001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "40401 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "40901 CONFLICT (already entered)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/teams/{id}/divisions/{division_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Cascades to the team's roster in that division. A team with a fixture in the division cannot be withdrawn.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Withdraw a team from a division",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "team id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "division id (uuid)",
+                        "name": "division_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "withdrawn"
+                    },
+                    "400": {
+                        "description": "40001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "40401 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "40901 CONFLICT (team has matches)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/teams/{id}/permanent": {
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Only a team already deleted with DELETE /teams/{id}. Cascades to its division entries and roster history; a team with scheduled or played matches cannot be removed. Cannot be undone.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Permanently delete a team",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "team id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "permanently deleted"
+                    },
+                    "404": {
+                        "description": "40401 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "40901 CONFLICT (not deleted yet, or team has matches)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -752,6 +1528,159 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "Team Captain"
+                }
+            }
+        },
+        "teams.AddDivisionTeamRequest": {
+            "type": "object",
+            "properties": {
+                "division_id": {
+                    "type": "string",
+                    "example": "7b1f0a52-2c6e-4d0a-9a3e-1f0c2b9d4e11"
+                }
+            }
+        },
+        "teams.AddRosterPlayerRequest": {
+            "type": "object",
+            "properties": {
+                "player_id": {
+                    "type": "string",
+                    "example": "2d9c4b1e-8f3a-4c57-b6d2-0e7a1f5c9b30"
+                }
+            }
+        },
+        "teams.CreateTeamRequest": {
+            "type": "object",
+            "properties": {
+                "division_id": {
+                    "type": "string",
+                    "example": "7b1f0a52-2c6e-4d0a-9a3e-1f0c2b9d4e11"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Cue Masters"
+                },
+                "team_code": {
+                    "type": "string",
+                    "example": "41503"
+                },
+                "venue_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "teams.DivisionTeamResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "division_id": {
+                    "type": "string"
+                },
+                "team_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "teams.RosterPlayerResponse": {
+            "type": "object",
+            "properties": {
+                "division_id": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "is_captain": {
+                    "type": "boolean"
+                },
+                "is_paid": {
+                    "type": "boolean"
+                },
+                "joined_at": {
+                    "type": "string"
+                },
+                "matches_played": {
+                    "type": "integer"
+                },
+                "matches_won": {
+                    "type": "integer"
+                },
+                "member_id": {
+                    "type": "string"
+                },
+                "player_id": {
+                    "type": "string"
+                },
+                "roster_id": {
+                    "type": "string"
+                },
+                "skill_level": {
+                    "type": "integer"
+                },
+                "team_id": {
+                    "type": "string"
+                },
+                "total_points": {
+                    "type": "integer"
+                }
+            }
+        },
+        "teams.TeamResponse": {
+            "type": "object",
+            "properties": {
+                "captain_player_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "team_code": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "venue_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "teams.TransferRosterPlayerRequest": {
+            "type": "object",
+            "properties": {
+                "division_id": {
+                    "type": "string"
+                },
+                "team_id": {
+                    "type": "string",
+                    "example": "5e8a2c1d-3b7f-4a90-8c6e-2d1f0b9a7e44"
+                }
+            }
+        },
+        "teams.UpdateTeamRequest": {
+            "type": "object",
+            "properties": {
+                "captain_player_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Cue Masters"
+                },
+                "team_code": {
+                    "type": "string",
+                    "example": "41503"
+                },
+                "venue_id": {
+                    "type": "string"
                 }
             }
         }

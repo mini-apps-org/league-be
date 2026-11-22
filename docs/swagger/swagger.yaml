@@ -158,6 +158,108 @@ definitions:
         example: Team Captain
         type: string
     type: object
+  teams.AddDivisionTeamRequest:
+    properties:
+      division_id:
+        example: 7b1f0a52-2c6e-4d0a-9a3e-1f0c2b9d4e11
+        type: string
+    type: object
+  teams.AddRosterPlayerRequest:
+    properties:
+      player_id:
+        example: 2d9c4b1e-8f3a-4c57-b6d2-0e7a1f5c9b30
+        type: string
+    type: object
+  teams.CreateTeamRequest:
+    properties:
+      division_id:
+        example: 7b1f0a52-2c6e-4d0a-9a3e-1f0c2b9d4e11
+        type: string
+      name:
+        example: Cue Masters
+        type: string
+      team_code:
+        example: "41503"
+        type: string
+      venue_id:
+        type: string
+    type: object
+  teams.DivisionTeamResponse:
+    properties:
+      created_at:
+        type: string
+      division_id:
+        type: string
+      team_id:
+        type: string
+    type: object
+  teams.RosterPlayerResponse:
+    properties:
+      division_id:
+        type: string
+      full_name:
+        type: string
+      is_captain:
+        type: boolean
+      is_paid:
+        type: boolean
+      joined_at:
+        type: string
+      matches_played:
+        type: integer
+      matches_won:
+        type: integer
+      member_id:
+        type: string
+      player_id:
+        type: string
+      roster_id:
+        type: string
+      skill_level:
+        type: integer
+      team_id:
+        type: string
+      total_points:
+        type: integer
+    type: object
+  teams.TeamResponse:
+    properties:
+      captain_player_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      team_code:
+        type: string
+      updated_at:
+        type: string
+      venue_id:
+        type: string
+    type: object
+  teams.TransferRosterPlayerRequest:
+    properties:
+      division_id:
+        type: string
+      team_id:
+        example: 5e8a2c1d-3b7f-4a90-8c6e-2d1f0b9a7e44
+        type: string
+    type: object
+  teams.UpdateTeamRequest:
+    properties:
+      captain_player_id:
+        type: string
+      name:
+        example: Cue Masters
+        type: string
+      team_code:
+        example: "41503"
+        type: string
+      venue_id:
+        type: string
+    type: object
 info:
   contact: {}
   description: League service with Google sign-in and server-side sessions.
@@ -487,6 +589,507 @@ paths:
       summary: Update a role
       tags:
       - roles
+  /teams:
+    get:
+      parameters:
+      - description: only teams entered in this division (uuid)
+        in: query
+        name: division_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/teams.TeamResponse'
+                  type: array
+              type: object
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "401":
+          description: 40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 40305 PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      summary: List teams
+      tags:
+      - teams
+    post:
+      consumes:
+      - application/json
+      description: '`division_id` is required: a team is created in a division. `team_code`
+        is the team code XXyyA (region, host location, team sequence), unique within
+        the division; lower case is accepted and stored upper case. The team then
+        enters a division with POST /teams/{id}/divisions, and the captain is set
+        with PATCH once the player is on the roster.'
+      parameters:
+      - description: team to create
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/teams.CreateTeamRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/teams.TeamResponse'
+              type: object
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305
+            PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 40901 CONFLICT (team_code taken)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Create a team
+      tags:
+      - teams
+  /teams-roster/{id}:
+    get:
+      description: Active players only, with their stats in the division (zero before
+        the first match).
+      parameters:
+      - description: team id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: division id (uuid)
+        in: query
+        name: division_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/teams.RosterPlayerResponse'
+                  type: array
+              type: object
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 40401 NOT_FOUND (team has not entered the division)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      summary: List a team's roster in a division
+      tags:
+      - rosters
+    post:
+      consumes:
+      - application/json
+      description: A player can be on only one active roster per division, and the
+        team must have entered the division.
+      parameters:
+      - description: team id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: division id (uuid)
+        in: query
+        name: division_id
+        required: true
+        type: string
+      - description: player to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/teams.AddRosterPlayerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/teams.RosterPlayerResponse'
+              type: object
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 40305 PERMISSION_DENIED (not the team captain, or an unpaid
+            member)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 40401 NOT_FOUND (player, or team has not entered the division)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 40901 CONFLICT (already on a roster in the division)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Add a player to a team's roster in a division
+      tags:
+      - rosters
+  /teams-roster/{id}/{player_id}:
+    delete:
+      description: Closes the roster entry rather than deleting it, so match history
+        keeps the player's team. The team captain cannot be removed.
+      parameters:
+      - description: team id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: player id (uuid)
+        in: path
+        name: player_id
+        required: true
+        type: string
+      - description: division id (uuid)
+        in: query
+        name: division_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: removed
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 40305 PERMISSION_DENIED (not the team captain, or an unpaid
+            member)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 40401 NOT_FOUND (team or roster entry)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 40901 CONFLICT (captain)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Remove a player from a team's roster in a division
+      tags:
+      - rosters
+    patch:
+      consumes:
+      - application/json
+      description: Closes the player's roster entry and opens one on `team_id`, in
+        `division_id` or the current division when absent, in one transaction. The
+        team captain cannot be transferred.
+      parameters:
+      - description: current team id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: player id (uuid)
+        in: path
+        name: player_id
+        required: true
+        type: string
+      - description: current division id (uuid)
+        in: query
+        name: division_id
+        required: true
+        type: string
+      - description: target team and division
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/teams.TransferRosterPlayerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/teams.RosterPlayerResponse'
+              type: object
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 40305 PERMISSION_DENIED (not the team captain, or an unpaid
+            member)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 40401 NOT_FOUND (team, roster entry, or target team has not
+            entered the division)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 40901 CONFLICT (captain, or already on a roster in the target
+            division)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Transfer a player to another team
+      tags:
+      - rosters
+  /teams/{id}:
+    delete:
+      description: 'Soft delete: the team is hidden and its active roster entries
+        are closed, freeing its players. Fixtures, division entries, roster history
+        and its team_code are kept until DELETE /teams/{id}/permanent.'
+      parameters:
+      - description: team id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: deleted
+        "404":
+          description: 40401 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Delete a team
+      tags:
+      - teams
+    get:
+      parameters:
+      - description: team id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/teams.TeamResponse'
+              type: object
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 40401 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      summary: Get a team
+      tags:
+      - teams
+    patch:
+      consumes:
+      - application/json
+      description: 'Partial update: an absent field is left unchanged. `captain_player_id`
+        must be on the team''s active roster in some division.'
+      parameters:
+      - description: team id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/teams.UpdateTeamRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/teams.TeamResponse'
+              type: object
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 40401 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 40901 CONFLICT (team_code taken)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Update a team
+      tags:
+      - teams
+  /teams/{id}/divisions:
+    post:
+      consumes:
+      - application/json
+      description: 'How a permanent team plays a season: one entry per division.'
+      parameters:
+      - description: team id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: division to enter
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/teams.AddDivisionTeamRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/teams.DivisionTeamResponse'
+              type: object
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 40401 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 40901 CONFLICT (already entered)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Enter a team into a division
+      tags:
+      - teams
+  /teams/{id}/divisions/{division_id}:
+    delete:
+      description: Cascades to the team's roster in that division. A team with a fixture
+        in the division cannot be withdrawn.
+      parameters:
+      - description: team id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: division id (uuid)
+        in: path
+        name: division_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: withdrawn
+        "400":
+          description: 40001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 40401 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 40901 CONFLICT (team has matches)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Withdraw a team from a division
+      tags:
+      - teams
+  /teams/{id}/permanent:
+    delete:
+      description: Only a team already deleted with DELETE /teams/{id}. Cascades to
+        its division entries and roster history; a team with scheduled or played matches
+        cannot be removed. Cannot be undone.
+      parameters:
+      - description: team id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: permanently deleted
+        "404":
+          description: 40401 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 40901 CONFLICT (not deleted yet, or team has matches)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Permanently delete a team
+      tags:
+      - teams
 securityDefinitions:
   CSRFToken:
     description: Echo the value of the `csrf` cookie. Required on every state-changing

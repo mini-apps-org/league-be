@@ -55,6 +55,7 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 	r.registerHealthRoute(api)
 	registerAuthRoute(api, authHandler, mw)
 	r.registerRoleRoute(api, mw, permissionService)
+	r.registerTeamRoute(api, mw, permissionService)
 
 	return router, nil
 }

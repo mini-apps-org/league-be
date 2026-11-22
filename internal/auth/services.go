@@ -17,7 +17,7 @@ import (
 // loginTxTTL bounds how long a user may sit on Google's consent screen.
 const loginTxTTL = 10 * time.Minute
 
-// signUpRoleCode is the role every new user gets; seeded by db/migrations/00001_init.sql.
+// signUpRoleCode is the role every new user gets; seeded by db/migrations/000001-init.sql.
 const signUpRoleCode = "PLAYER"
 
 type Service interface {

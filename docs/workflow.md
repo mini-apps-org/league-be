@@ -98,7 +98,9 @@ environment variables. So:
   `IF NOT EXISTS`. Ids are `TEXT` holding `uuid_generate_v4()`, so every FK into them is
   `TEXT` too.
 - Dev data: `db/migrations/seeds/YYYYMMDD_seed.sql`, keyed on natural keys only, so it
-  re-reads top to bottom without depending on generated uuids.
+  re-reads top to bottom without depending on generated uuids. A new checkout applies the
+  **latest** seed only, after the schema; it truncates its league data first, so it can be
+  re-applied to reset dev data. Rules: `.claude/rules/migrations.md` §6.
 - No migration runner is wired into the Makefile — apply with `psql "$DATABASE_URL" -f <file>`
   and say so in the PR description, including the order.
 
