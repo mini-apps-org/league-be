@@ -1,5 +1,18 @@
 # Changelog
 
+## [TBD](https://github.com/mini-apps-org/league-be/releases/tag/TBD) - 2026-11-XX
+
+- [#TBD](https://github.com/mini-apps-org/league-be/pull/TBD)
+  - feat(team): add the teams API — create a team in its home division, update it, and enter it into more divisions
+  - feat(roster): add per-division rosters at `/teams-roster/{id}` — add, transfer and remove players; a captain changes only their own team
+  - feat(team): filter, sort and cursor-page the team and roster lists with `q`, `sort`, `limit` and `cursor`
+  - feat(team): soft-delete a team with `DELETE /teams/{id}`, then remove it for good with `DELETE /teams/{id}/permanent`
+  - feat(team): bulk-delete up to 100 teams with `DELETE /teams` and `DELETE /teams/permanent`, reporting each id that failed
+  - feat(roles): soft-delete roles and add `DELETE /roles/{id}/permanent` — a deleted role stops granting permissions at once
+  - refactor(response): success bodies are now `{ data, metadata }`, with `count`, `total`, `has_more` and `next_cursor` on lists — breaking: top-level `count` and `session_id` are gone
+  - feat(logger): inject `*slog.Logger` into services and repositories, and log runtime-built team SQL at debug level
+  - refactor(db): rename the schema to `000001-init.sql` and add dated migrations under `db/migrations/2026/`
+
 ## [0.7.0](https://github.com/mini-apps-org/league-be/releases/tag/0.7.0) - 2026-11-19
 
 - [#PR6](https://github.com/mini-apps-org/league-be/pull/PR6)
