@@ -4,17 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/nguyentanvinh/league-be/internal/common"
 	"github.com/nguyentanvinh/league-be/internal/platform/config"
 	"github.com/nguyentanvinh/league-be/internal/platform/handler"
+	"github.com/nguyentanvinh/league-be/internal/platform/model"
 )
 
-const maxTeamNameLength = 100
+const (
+	maxTeamNameLength    = 100
+	maxSearchQueryLength = 100
+)
 
 var (
 	// teamCodePattern is the ID Generation Rules' XXyyA: region, host location, team
@@ -33,16 +40,16 @@ type PermissionReader interface {
 
 type Service interface {
 	CreateTeam(ctx context.Context, params CreateTeamServiceParams) (*Team, error)
-	GetTeam(ctx context.Context, id string) (*Team, error)
-	ListTeams(ctx context.Context, params ListTeamsServiceParams) ([]Team, error)
+	GetTeamByID(ctx context.Context, id string) (*Team, error)
+	ListTeams(ctx context.Context, params ListTeamsServiceParams) (*model.CursorResponse[Team], error)
 	UpdateTeam(ctx context.Context, id string, params UpdateTeamServiceParams) (*Team, error)
-	DeleteTeam(ctx context.Context, id string) error
-	HardDeleteTeam(ctx context.Context, id string) error
+	DeleteTeamByID(ctx context.Context, id string) error
+	PermanentDeleteTeam(ctx context.Context, id string) error
 
 	AddDivisionTeam(ctx context.Context, divisionID, teamID string) (*DivisionTeam, error)
 	RemoveDivisionTeam(ctx context.Context, divisionID, teamID string) error
 
-	ListRosterPlayers(ctx context.Context, divisionID, teamID string) ([]RosterPlayer, error)
+	ListRosterPlayers(ctx context.Context, params ListRosterPlayersServiceParams) (*model.CursorResponse[RosterPlayer], error)
 	AddRosterPlayer(ctx context.Context, actorUserID string, params RosterEntryServiceParams) (*RosterPlayer, error)
 	RemoveRosterPlayer(ctx context.Context, actorUserID string, params RosterEntryServiceParams) error
 	TransferRosterPlayer(ctx context.Context, actorUserID string, params TransferRosterPlayerServiceParams) (*RosterPlayer, error)
@@ -51,10 +58,15 @@ type Service interface {
 type service struct {
 	repo             Repository
 	permissionReader PermissionReader
+	logger           *slog.Logger
 }
 
-func NewService(repo Repository, permissionReader PermissionReader) Service {
-	return &service{repo: repo, permissionReader: permissionReader}
+func NewService(repo Repository, permissionReader PermissionReader, logger *slog.Logger) Service {
+	return &service{
+		repo:             repo,
+		permissionReader: permissionReader,
+		logger:           logger.With(slog.String("component", "teams.service")),
+	}
 }
 
 func (s *service) CreateTeam(ctx context.Context, params CreateTeamServiceParams) (*Team, error) {
@@ -75,19 +87,45 @@ func (s *service) CreateTeam(ctx context.Context, params CreateTeamServiceParams
 	return team, asAPIError(err)
 }
 
-func (s *service) GetTeam(ctx context.Context, id string) (*Team, error) {
+func (s *service) GetTeamByID(ctx context.Context, id string) (*Team, error) {
 	team, err := s.repo.GetTeamByID(ctx, id)
 	return team, asAPIError(err)
 }
 
-func (s *service) ListTeams(ctx context.Context, params ListTeamsServiceParams) ([]Team, error) {
+func (s *service) ListTeams(ctx context.Context, params ListTeamsServiceParams) (*model.CursorResponse[Team], error) {
 	if params.DivisionID != "" {
 		if err := validateUUIDByFieldAndValue("division_id", params.DivisionID); err != nil {
 			return nil, err
 		}
 	}
+	if params.VenueID != "" {
+		if err := validateUUIDByFieldAndValue("venue_id", params.VenueID); err != nil {
+			return nil, err
+		}
+	}
+	query, err := normaliseSearchQuery(params.Query)
+	if err != nil {
+		return nil, err
+	}
+	params.Query = query
+	if err := normalisePage(&params.Page, params.Sort); err != nil {
+		return nil, err
+	}
 
-	return s.repo.ListTeams(ctx, params)
+	total, err := countOnFirstPage(params.Page, func() (int64, error) { return s.repo.CountTeams(ctx, params) })
+	if err != nil {
+		return nil, err
+	}
+
+	teams, err := s.repo.ListTeams(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	page := model.NewCursorResponse(teams, params.Page.Limit, func(team Team) model.Cursor {
+		return model.Cursor{Sort: params.Sort.String(), LastValue: teamSortValue(team, params.Sort.Field), LastID: team.ID}
+	})
+	page.Total = total
+	return page, nil
 }
 
 func (s *service) UpdateTeam(ctx context.Context, id string, params UpdateTeamServiceParams) (*Team, error) {
@@ -127,12 +165,12 @@ func (s *service) UpdateTeam(ctx context.Context, id string, params UpdateTeamSe
 	return team, asAPIError(err)
 }
 
-func (s *service) DeleteTeam(ctx context.Context, id string) error {
+func (s *service) DeleteTeamByID(ctx context.Context, id string) error {
 	return asAPIError(s.repo.SoftDeleteTeam(ctx, id))
 }
 
-func (s *service) HardDeleteTeam(ctx context.Context, id string) error {
-	return asAPIError(s.repo.HardDeleteTeam(ctx, id))
+func (s *service) PermanentDeleteTeam(ctx context.Context, id string) error {
+	return asAPIError(s.repo.PermanentDeleteTeam(ctx, id))
 }
 
 func (s *service) AddDivisionTeam(ctx context.Context, divisionID, teamID string) (*DivisionTeam, error) {
@@ -148,15 +186,115 @@ func (s *service) RemoveDivisionTeam(ctx context.Context, divisionID, teamID str
 	return asAPIError(s.repo.RemoveDivisionTeam(ctx, divisionID, teamID))
 }
 
-func (s *service) ListRosterPlayers(ctx context.Context, divisionID, teamID string) ([]RosterPlayer, error) {
-	if err := validateUUIDByFieldAndValue("division_id", divisionID); err != nil {
+func (s *service) ListRosterPlayers(ctx context.Context, params ListRosterPlayersServiceParams) (*model.CursorResponse[RosterPlayer], error) {
+	if err := validateUUIDByFieldAndValue("division_id", params.DivisionID); err != nil {
 		return nil, err
 	}
-	if _, err := s.repo.GetDivisionTeam(ctx, divisionID, teamID); err != nil {
+	query, err := normaliseSearchQuery(params.Query)
+	if err != nil {
+		return nil, err
+	}
+	params.Query = query
+
+	if err := normalisePage(&params.Page, params.Sort); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.repo.GetDivisionTeam(ctx, params.DivisionID, params.TeamID); err != nil {
 		return nil, asAPIError(err)
 	}
 
-	return s.repo.ListRosterPlayers(ctx, divisionID, teamID)
+	total, err := countOnFirstPage(params.Page, func() (int64, error) { return s.repo.CountRosterPlayers(ctx, params) })
+	if err != nil {
+		return nil, err
+	}
+
+	players, err := s.repo.ListRosterPlayers(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	page := model.NewCursorResponse(players, params.Page.Limit, func(player RosterPlayer) model.Cursor {
+		return model.Cursor{Sort: params.Sort.String(), LastValue: rosterSortValue(player, params.Sort.Field), LastID: player.PlayerID}
+	})
+	page.Total = total
+	return page, nil
+}
+
+// countOnFirstPage runs count only for the first page (no cursor) and returns nil after:
+// one COUNT per list view rather than one per page. The count and the page are separate
+// queries, so a row written between them can make the total differ from what paging
+// finds by that row.
+func countOnFirstPage(page model.CursorParams, count func() (int64, error)) (*int64, error) {
+	if page.After != nil {
+		return nil, nil
+	}
+	total, err := count()
+	if err != nil {
+		return nil, err
+	}
+	return &total, nil
+}
+
+// normalisePage bounds the page and decodes its cursor, then checks the cursor's values
+// parse as the sort column's type. The cursor is client-held, so an edited one must stop
+// at a 400 rather than reach Postgres as a failed cast and a 500.
+func normalisePage(page *model.CursorParams, sort model.SortParams) error {
+	if err := page.Normalise(sort); err != nil {
+		return err
+	}
+	if page.After == nil {
+		return nil
+	}
+
+	if err := common.ValidateUUID(page.After.LastID); err != nil {
+		return model.InvalidCursorError()
+	}
+
+	var err error
+	switch sort.Field {
+	case TeamSortByCreatedAt, RosterSortByJoinedAt:
+		_, err = time.Parse(time.RFC3339Nano, page.After.LastValue)
+	case RosterSortBySkillLevel, RosterSortByMatchesPlayed, RosterSortByMatchesWon, RosterSortByTotalPoints:
+		_, err = strconv.Atoi(page.After.LastValue)
+	}
+	if err != nil {
+		return model.InvalidCursorError()
+	}
+	return nil
+}
+
+// teamSortValue is the row's value in the sort column, as a cursor carries it. Keep in
+// step with teamSortColumn.
+func teamSortValue(team Team, field string) string {
+	switch field {
+	case TeamSortByName:
+		return team.Name
+	case TeamSortByCreatedAt:
+		return team.CreatedAt.Format(time.RFC3339Nano)
+	default:
+		return team.TeamCode
+	}
+}
+
+// rosterSortValue is the row's value in the sort column, as a cursor carries it. Keep in
+// step with rosterSortColumn.
+func rosterSortValue(player RosterPlayer, field string) string {
+	switch field {
+	case RosterSortByMemberID:
+		return player.MemberID
+	case RosterSortBySkillLevel:
+		return strconv.Itoa(int(player.SkillLevel))
+	case RosterSortByMatchesPlayed:
+		return strconv.Itoa(int(player.MatchesPlayed))
+	case RosterSortByMatchesWon:
+		return strconv.Itoa(int(player.MatchesWon))
+	case RosterSortByTotalPoints:
+		return strconv.Itoa(int(player.TotalPoints))
+	case RosterSortByJoinedAt:
+		return player.JoinedAt.Format(time.RFC3339Nano)
+	default:
+		return player.FullName
+	}
 }
 
 func (s *service) AddRosterPlayer(ctx context.Context, actorUserID string, params RosterEntryServiceParams) (*RosterPlayer, error) {
@@ -327,6 +465,15 @@ func validateOptionalUUIDByFieldAndValue(field string, value *string) error {
 		return nil
 	}
 	return validateUUIDByFieldAndValue(field, *value)
+}
+
+// normaliseSearchQuery trims ?q; blank means no search.
+func normaliseSearchQuery(query string) (string, error) {
+	query = strings.TrimSpace(query)
+	if utf8.RuneCountInString(query) > maxSearchQueryLength {
+		return "", newValidationError(fmt.Sprintf("q must be at most %d characters", maxSearchQueryLength))
+	}
+	return query, nil
 }
 
 func newValidationError(message string) error {

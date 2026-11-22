@@ -1,37 +1,41 @@
 package handler
 
 // SuccessResponse is the body of every successful response; T is the shape of Data. Its
-// counterpart for failures is ErrorResponse. Metadata is set only by paged lists and
-// omitted otherwise.
+// counterpart for failures is ErrorResponse.
 type SuccessResponse[T any] struct {
-	SessionID string          `json:"session_id"`
-	Count     *int64          `json:"count"`
-	Data      T               `json:"data"`
-	Metadata  *CursorMetadata `json:"metadata,omitempty"`
+	Data     T         `json:"data"`
+	Metadata *Metadata `json:"metadata,omitempty"` // lists only; nil for a single item
 }
 
-// CursorMetadata is a paged list's Metadata. NextCursor is null on the last page. Total is
-// the number of rows matching the filters, sent on the first page only (no cursor): one
-// COUNT per list view rather than one per page. It lives here rather than in
-// platform/model, which imports this package.
-type CursorMetadata struct {
-	NextCursor *string `json:"next_cursor"`
-	Total      *int64  `json:"total,omitempty"`
+// Metadata describes a list response. Build it with NewMetadata or
+// NewPageMetadata rather than field by field, so Count always matches Data and HasMore
+// always matches NextCursor.
+//
+// It lives here rather than in platform/model, which imports this package.
+type Metadata struct {
+	Count int64 `json:"count"` // rows in this response: len(Data)
+	// Rows matching the filters, across all pages. Sent on the first page only (no cursor):
+	// one COUNT per list view rather than one per page.
+	Total *int64 `json:"total,omitempty"`
+	// Whether another page follows: NextCursor != nil. Always false on a list that is not
+	// paged.
+	HasMore bool `json:"has_more"`
+	// Pass back as ?cursor= for the next page. Absent when HasMore is false.
+	NextCursor *string `json:"next_cursor,omitempty"`
 }
 
-// responseWithDefaultCount is implemented by every SuccessResponse[T]. A type switch
-// cannot name SuccessResponse without its T, so ReturnWithJSON finds it through this
-// interface instead.
-type responseWithDefaultCount interface {
-	withDefaultCount() any
+// NewMetadata is the metadata of a list returned whole, in one response.
+func NewMetadata(count int) *Metadata {
+	return &Metadata{Count: int64(count)}
 }
 
-// withDefaultCount sets Count to 1 when a single item is returned without one. It has a
-// value receiver: handlers pass SuccessResponse values, not pointers.
-func (r SuccessResponse[T]) withDefaultCount() any {
-	if r.Count == nil {
-		one := int64(1)
-		r.Count = &one
+// NewPageMetadata is the metadata of one page of a paged list. total is nil after the
+// first page; nextCursor is nil on the last.
+func NewPageMetadata(count int, total *int64, nextCursor *string) *Metadata {
+	return &Metadata{
+		Count:      int64(count),
+		Total:      total,
+		HasMore:    nextCursor != nil,
+		NextCursor: nextCursor,
 	}
-	return r
 }

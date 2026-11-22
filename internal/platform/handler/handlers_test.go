@@ -6,11 +6,10 @@ import (
 	"testing"
 )
 
-// ReturnWithJSON finds a SuccessResponse through responseWithDefaultCount. Give
-// withDefaultCount a pointer receiver and the values handlers pass stop matching: every
-// single-item response would silently serve "count": null.
+// The success body is the frontend's contract. A dropped omitempty would send "metadata":
+// null on every single item, or "total": null / "next_cursor": null where the client
+// expects the key to be absent; has_more must always agree with next_cursor.
 func TestReturnWithJSONSuccessResponse(t *testing.T) {
-	two := int64(2)
 	total := int64(87)
 	next := "c1"
 
@@ -19,21 +18,24 @@ func TestReturnWithJSONSuccessResponse(t *testing.T) {
 		body any
 		want string
 	}{
-		{"single item gets count 1, no metadata",
+		{"single item has no metadata",
 			SuccessResponse[string]{Data: "team"},
-			`{"session_id":"","count":1,"data":"team"}` + "\n"},
-		{"list keeps its count",
-			SuccessResponse[[]string]{Count: &two, Data: []string{"a", "b"}},
-			`{"session_id":"","count":2,"data":["a","b"]}` + "\n"},
-		{"paged list carries next_cursor",
-			SuccessResponse[[]string]{Count: &two, Data: []string{"a", "b"}, Metadata: &CursorMetadata{NextCursor: &next}},
-			`{"session_id":"","count":2,"data":["a","b"],"metadata":{"next_cursor":"c1"}}` + "\n"},
-		{"first page carries the total",
-			SuccessResponse[[]string]{Count: &two, Data: []string{"a", "b"}, Metadata: &CursorMetadata{NextCursor: &next, Total: &total}},
-			`{"session_id":"","count":2,"data":["a","b"],"metadata":{"next_cursor":"c1","total":87}}` + "\n"},
-		{"last page has null next_cursor",
-			SuccessResponse[[]string]{Count: &two, Data: []string{"a", "b"}, Metadata: &CursorMetadata{}},
-			`{"session_id":"","count":2,"data":["a","b"],"metadata":{"next_cursor":null}}` + "\n"},
+			`{"data":"team"}`},
+		{"unpaged list counts its rows",
+			SuccessResponse[[]string]{Data: []string{"a", "b"}, Metadata: NewMetadata(2)},
+			`{"data":["a","b"],"metadata":{"count":2,"has_more":false}}`},
+		{"first page of a paged list",
+			SuccessResponse[[]string]{Data: []string{"a", "b"}, Metadata: NewPageMetadata(2, &total, &next)},
+			`{"data":["a","b"],"metadata":{"count":2,"total":87,"has_more":true,"next_cursor":"c1"}}`},
+		{"middle page has no total",
+			SuccessResponse[[]string]{Data: []string{"a", "b"}, Metadata: NewPageMetadata(2, nil, &next)},
+			`{"data":["a","b"],"metadata":{"count":2,"has_more":true,"next_cursor":"c1"}}`},
+		{"last page: has_more false, no next_cursor",
+			SuccessResponse[[]string]{Data: []string{"a", "b"}, Metadata: NewPageMetadata(2, nil, nil)},
+			`{"data":["a","b"],"metadata":{"count":2,"has_more":false}}`},
+		{"single page: total and no more",
+			SuccessResponse[[]string]{Data: []string{}, Metadata: NewPageMetadata(0, new(int64), nil)},
+			`{"data":[],"metadata":{"count":0,"total":0,"has_more":false}}`},
 	}
 
 	for _, tt := range tests {
@@ -41,7 +43,7 @@ func TestReturnWithJSONSuccessResponse(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			(&Handler{}).ReturnWithJSON(recorder, http.StatusOK, tt.body)
 
-			if got := recorder.Body.String(); got != tt.want {
+			if got := recorder.Body.String(); got != tt.want+"\n" {
 				t.Errorf("body = %s\nwant   %s", got, tt.want)
 			}
 		})

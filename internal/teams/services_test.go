@@ -3,9 +3,12 @@ package teams
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/nguyentanvinh/league-be/internal/platform/handler"
+	"github.com/nguyentanvinh/league-be/internal/platform/model"
 )
 
 const (
@@ -22,6 +25,9 @@ const (
 	testOtherCaptainUser = "user-other-captain"
 	testNoPlayerUser     = "user-without-player"
 )
+
+// testLogger discards: the tests assert on results, not on log lines.
+var testLogger = slog.New(slog.DiscardHandler)
 
 // fakePermissions grants team.update to testAdminUser only, as the seed does to SUPER_ADMIN.
 type fakePermissions struct{}
@@ -40,6 +46,10 @@ type fakeRepository struct {
 	Repository
 	activePlayerIDs map[string]bool
 	created         *CreateTeamServiceParams
+	listedTeams     *ListTeamsServiceParams
+	teamRows        []Team
+	countCalls      int
+	listedRoster    *ListRosterPlayersServiceParams
 	added           bool
 	removed         bool
 	transferred     bool
@@ -109,6 +119,30 @@ func (f *fakeRepository) TransferRosterPlayer(context.Context, TransferRosterPla
 	return nil
 }
 
+func (f *fakeRepository) ListTeams(_ context.Context, params ListTeamsServiceParams) ([]Team, error) {
+	f.listedTeams = &params
+	return f.teamRows, nil
+}
+
+func (f *fakeRepository) CountTeams(context.Context, ListTeamsServiceParams) (int64, error) {
+	f.countCalls++
+	return 42, nil
+}
+
+func (f *fakeRepository) CountRosterPlayers(context.Context, ListRosterPlayersServiceParams) (int64, error) {
+	f.countCalls++
+	return 7, nil
+}
+
+func (f *fakeRepository) GetDivisionTeam(_ context.Context, divisionID, teamID string) (*DivisionTeam, error) {
+	return &DivisionTeam{DivisionID: divisionID, TeamID: teamID}, nil
+}
+
+func (f *fakeRepository) ListRosterPlayers(_ context.Context, params ListRosterPlayersServiceParams) ([]RosterPlayer, error) {
+	f.listedRoster = &params
+	return []RosterPlayer{}, nil
+}
+
 func errorCode(err error) handler.ErrorCode {
 	var apiErr *handler.APIError
 	if errors.As(err, &apiErr) {
@@ -135,7 +169,7 @@ func TestCreateTeamValidatesTeamCode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.teamCode, func(t *testing.T) {
 			repo := newFakeRepository()
-			_, err := NewService(repo, fakePermissions{}).CreateTeam(context.Background(), CreateTeamServiceParams{
+			_, err := NewService(repo, fakePermissions{}, testLogger).CreateTeam(context.Background(), CreateTeamServiceParams{
 				DivisionID: testDivisionID,
 				TeamCode:   tt.teamCode,
 				Name:       "Cue Masters",
@@ -175,7 +209,7 @@ func TestCaptainCannotLeaveRoster(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := newFakeRepository()
-			err := tt.run(NewService(repo, fakePermissions{}))
+			err := tt.run(NewService(repo, fakePermissions{}, testLogger))
 
 			if got := errorCode(err); got != handler.CodeConflict {
 				t.Fatalf("error code = %q, want %q (err: %v)", got, handler.CodeConflict, err)
@@ -204,7 +238,7 @@ func TestUpdateTeamCaptainMustBeOnRoster(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := newFakeRepository()
-			_, err := NewService(repo, fakePermissions{}).UpdateTeam(context.Background(), testTeamID, UpdateTeamServiceParams{
+			_, err := NewService(repo, fakePermissions{}, testLogger).UpdateTeam(context.Background(), testTeamID, UpdateTeamServiceParams{
 				CaptainPlayerID: &tt.playerID,
 			})
 
@@ -223,7 +257,7 @@ func TestUpdateTeamCaptainMustBeOnRoster(t *testing.T) {
 // current one, so omitting it must not slip past this check.
 func TestTransferToSameRosterRejected(t *testing.T) {
 	repo := newFakeRepository()
-	_, err := NewService(repo, fakePermissions{}).TransferRosterPlayer(context.Background(), testAdminUser, TransferRosterPlayerServiceParams{
+	_, err := NewService(repo, fakePermissions{}, testLogger).TransferRosterPlayer(context.Background(), testAdminUser, TransferRosterPlayerServiceParams{
 		From:     RosterEntryServiceParams{DivisionID: testDivisionID, TeamID: testTeamID, PlayerID: testPlayerID},
 		ToTeamID: testTeamID,
 	})
@@ -282,7 +316,7 @@ func TestRosterWritesAreCaptainScoped(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := newFakeRepository()
-			err := tt.run(NewService(repo, fakePermissions{}), tt.user)
+			err := tt.run(NewService(repo, fakePermissions{}, testLogger), tt.user)
 
 			if got := errorCode(err); got != tt.wantCode {
 				t.Fatalf("error code = %q, want %q (err: %v)", got, tt.wantCode, err)
@@ -325,6 +359,199 @@ func TestAsAPIErrorUnwrapsSentinels(t *testing.T) {
 	}
 }
 
+// List filters reach SQL as uuid casts: a malformed id must stop at a 400 rather than a
+// Postgres cast error served as 500, and a search term is trimmed so " cue " finds "Cue".
+func TestListFiltersAreValidated(t *testing.T) {
+	longQuery := strings.Repeat("a", maxSearchQueryLength+1)
+
+	tests := []struct {
+		name      string
+		params    ListTeamsServiceParams
+		wantCode  handler.ErrorCode
+		wantQuery string
+	}{
+		{"no filters", ListTeamsServiceParams{}, "", ""},
+		{"trimmed search", ListTeamsServiceParams{Query: "  cue  "}, "", "cue"},
+		{"blank search", ListTeamsServiceParams{Query: "   "}, "", ""},
+		{"division not a uuid", ListTeamsServiceParams{DivisionID: "abc"}, handler.CodeValidationFailed, ""},
+		{"venue not a uuid", ListTeamsServiceParams{VenueID: "abc"}, handler.CodeValidationFailed, ""},
+		{"search too long", ListTeamsServiceParams{Query: longQuery}, handler.CodeValidationFailed, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newFakeRepository()
+			_, err := NewService(repo, fakePermissions{}, testLogger).ListTeams(context.Background(), tt.params)
+
+			if got := errorCode(err); got != tt.wantCode {
+				t.Fatalf("error code = %q, want %q (err: %v)", got, tt.wantCode, err)
+			}
+			if tt.wantCode != "" {
+				if repo.listedTeams != nil {
+					t.Error("an invalid filter reached the repository")
+				}
+				return
+			}
+			if repo.listedTeams.Query != tt.wantQuery {
+				t.Errorf("query = %q, want %q", repo.listedTeams.Query, tt.wantQuery)
+			}
+		})
+	}
+
+	t.Run("roster search too long", func(t *testing.T) {
+		repo := newFakeRepository()
+		_, err := NewService(repo, fakePermissions{}, testLogger).ListRosterPlayers(context.Background(), ListRosterPlayersServiceParams{
+			DivisionID: testDivisionID, TeamID: testTeamID, Query: longQuery,
+		})
+		if got := errorCode(err); got != handler.CodeValidationFailed {
+			t.Fatalf("error code = %q, want %q (err: %v)", got, handler.CodeValidationFailed, err)
+		}
+		if repo.listedRoster != nil {
+			t.Error("an invalid search reached the repository")
+		}
+	})
+}
+
+// The cursor is client-held. An edited value must stop at a 400: in SQL it becomes
+// $n::timestamptz or $n::integer, and a failed cast would be served as a 500.
+func TestListCursorIsValidated(t *testing.T) {
+	byCreatedAt := model.SortParams{Field: TeamSortByCreatedAt}
+	cursor := func(value, id string) string {
+		return model.EncodeCursor(model.Cursor{Sort: byCreatedAt.String(), LastValue: value, LastID: id})
+	}
+
+	tests := []struct {
+		name     string
+		cursor   string
+		wantCode handler.ErrorCode
+	}{
+		{"valid", cursor("2026-11-22T07:00:00.123456Z", testTeamID), ""},
+		{"value not a time", cursor("yesterday", testTeamID), handler.CodeValidationFailed},
+		{"id not a uuid", cursor("2026-11-22T07:00:00Z", "abc"), handler.CodeValidationFailed},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newFakeRepository()
+			_, err := NewService(repo, fakePermissions{}, testLogger).ListTeams(context.Background(), ListTeamsServiceParams{
+				Sort: byCreatedAt,
+				Page: model.CursorParams{Cursor: tt.cursor},
+			})
+
+			if got := errorCode(err); got != tt.wantCode {
+				t.Fatalf("error code = %q, want %q (err: %v)", got, tt.wantCode, err)
+			}
+			if (repo.listedTeams != nil) != (tt.wantCode == "") {
+				t.Errorf("reached repository = %v, want %v", repo.listedTeams != nil, tt.wantCode == "")
+			}
+		})
+	}
+}
+
+// The next cursor must carry the last served row's value in the sort column; one built
+// from another column would start the next page in the wrong place.
+func TestListTeamsNextCursor(t *testing.T) {
+	repo := newFakeRepository()
+	for i := range model.DefaultLimit + 1 {
+		repo.teamRows = append(repo.teamRows, Team{ID: strings.Repeat(string(rune('a'+i)), 3), Name: string(rune('A' + i))})
+	}
+
+	byNameDesc := model.SortParams{Field: TeamSortByName, Desc: true}
+	page, err := NewService(repo, fakePermissions{}, testLogger).ListTeams(context.Background(), ListTeamsServiceParams{Sort: byNameDesc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repo.listedTeams.Page.Limit != model.DefaultLimit {
+		t.Errorf("repository asked for limit %d, want %d", repo.listedTeams.Page.Limit, model.DefaultLimit)
+	}
+	if len(page.Items) != model.DefaultLimit || page.NextCursor == nil {
+		t.Fatalf("got %d items, next %v; want %d and a cursor", len(page.Items), page.NextCursor, model.DefaultLimit)
+	}
+
+	next, err := model.DecodeCursor(*page.NextCursor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := page.Items[len(page.Items)-1]
+	want := model.Cursor{Sort: "-name", LastValue: last.Name, LastID: last.ID}
+	if *next != want {
+		t.Errorf("next cursor = %+v, want %+v", *next, want)
+	}
+}
+
+// A client's limit must reach the query as limit+1 and size the page; dropping it would
+// silently serve the default 10.
+func TestListTeamsHonoursLimit(t *testing.T) {
+	repo := newFakeRepository()
+	for i := range 6 {
+		repo.teamRows = append(repo.teamRows, Team{ID: string(rune('a' + i)), TeamCode: string(rune('A' + i))})
+	}
+
+	page, err := NewService(repo, fakePermissions{}, testLogger).ListTeams(context.Background(), ListTeamsServiceParams{
+		Page: model.CursorParams{Limit: 5},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repo.listedTeams.Page.Limit != 5 {
+		t.Errorf("repository asked for limit %d, want 5", repo.listedTeams.Page.Limit)
+	}
+	if len(page.Items) != 5 || page.NextCursor == nil {
+		t.Errorf("got %d items, next %v; want 5 and a cursor", len(page.Items), page.NextCursor)
+	}
+}
+
+// The total costs a second query, so it is counted once per list view: on the first page,
+// and never again while the client follows cursors.
+func TestListTotalOnFirstPageOnly(t *testing.T) {
+	sort := model.SortParams{Field: TeamSortByTeamCode}
+	laterPage := model.EncodeCursor(model.Cursor{Sort: sort.String(), LastValue: "41503", LastID: testTeamID})
+
+	tests := []struct {
+		name       string
+		cursor     string
+		wantTotal  *int64
+		wantCounts int
+	}{
+		{"first page", "", ptrInt64(42), 1},
+		{"later page", laterPage, nil, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newFakeRepository()
+			page, err := NewService(repo, fakePermissions{}, testLogger).ListTeams(context.Background(), ListTeamsServiceParams{
+				Sort: sort,
+				Page: model.CursorParams{Cursor: tt.cursor},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if repo.countCalls != tt.wantCounts {
+				t.Errorf("count queries = %d, want %d", repo.countCalls, tt.wantCounts)
+			}
+			if (page.Total == nil) != (tt.wantTotal == nil) || (page.Total != nil && *page.Total != *tt.wantTotal) {
+				t.Errorf("total = %v, want %v", page.Total, tt.wantTotal)
+			}
+		})
+	}
+
+	t.Run("roster first page", func(t *testing.T) {
+		repo := newFakeRepository()
+		page, err := NewService(repo, fakePermissions{}, testLogger).ListRosterPlayers(context.Background(), ListRosterPlayersServiceParams{
+			DivisionID: testDivisionID, TeamID: testTeamID, Sort: model.SortParams{Field: RosterSortByFullName},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page.Total == nil || *page.Total != 7 {
+			t.Errorf("total = %v, want 7", page.Total)
+		}
+	})
+}
+
+func ptrInt64(value int64) *int64 { return &value }
+
 // teams.division_id is NOT NULL. A missing or malformed division_id must stop at a 400 in
 // the service, not reach Postgres as a NOT NULL or uuid-cast error served as a 500.
 func TestCreateTeamRequiresDivision(t *testing.T) {
@@ -341,7 +568,7 @@ func TestCreateTeamRequiresDivision(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := newFakeRepository()
-			_, err := NewService(repo, fakePermissions{}).CreateTeam(context.Background(), CreateTeamServiceParams{
+			_, err := NewService(repo, fakePermissions{}, testLogger).CreateTeam(context.Background(), CreateTeamServiceParams{
 				DivisionID: tt.divisionID,
 				TeamCode:   "41503",
 				Name:       "Cue Masters",

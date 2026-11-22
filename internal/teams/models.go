@@ -1,7 +1,36 @@
 // Package teams owns team CRUD, a team's entries into divisions, and its roster in each.
 package teams
 
-import "time"
+import (
+	"time"
+
+	"github.com/nguyentanvinh/league-be/internal/platform/model"
+)
+
+// Fields a team list can be sorted by: ?sort=name, or ?sort=-name for descending.
+const (
+	TeamSortByTeamCode  = "team_code"
+	TeamSortByName      = "name"
+	TeamSortByCreatedAt = "created_at"
+)
+
+var teamSortFields = []string{TeamSortByTeamCode, TeamSortByName, TeamSortByCreatedAt}
+
+// Fields a roster can be sorted by: the columns of the roster screen.
+const (
+	RosterSortByFullName      = "full_name"
+	RosterSortByMemberID      = "member_id"
+	RosterSortBySkillLevel    = "skill_level"
+	RosterSortByMatchesPlayed = "matches_played"
+	RosterSortByMatchesWon    = "matches_won"
+	RosterSortByTotalPoints   = "total_points"
+	RosterSortByJoinedAt      = "joined_at"
+)
+
+var rosterSortFields = []string{
+	RosterSortByFullName, RosterSortByMemberID, RosterSortBySkillLevel,
+	RosterSortByMatchesPlayed, RosterSortByMatchesWon, RosterSortByTotalPoints, RosterSortByJoinedAt,
+}
 
 // Team is permanent: one row and one team_code for life. It plays a season by entering
 // a division (DivisionTeam).
@@ -39,12 +68,27 @@ type RosterPlayer struct {
 	JoinedAt      time.Time `db:"joined_at"`
 }
 
+// ListTeamsServiceParams filters are ANDed; an empty one is not applied.
 type ListTeamsServiceParams struct {
 	DivisionID string
+	VenueID    string
+	Query      string // matches name or team_code, case-insensitive
+	Sort       model.SortParams
+	Page       model.CursorParams
 }
 
+type ListRosterPlayersServiceParams struct {
+	DivisionID string
+	TeamID     string
+	Query      string // matches full_name or member_id, case-insensitive
+	Sort       model.SortParams
+	Page       model.CursorParams
+}
+
+// CreateTeamServiceParams creates a team in its home division: teams.division_id is NOT
+// NULL, and the team is entered into that division in the same transaction.
 type CreateTeamServiceParams struct {
-	DivisionID string // required: teams.division_id is NOT NULL
+	DivisionID string
 	TeamCode   string
 	Name       string
 	VenueID    *string

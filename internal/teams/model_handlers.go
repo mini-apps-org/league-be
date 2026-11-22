@@ -1,6 +1,10 @@
 package teams
 
-import "time"
+import (
+	"time"
+
+	"github.com/nguyentanvinh/league-be/internal/common"
+)
 
 type CreateTeamRequest struct {
 	DivisionID string  `json:"division_id" example:"7b1f0a52-2c6e-4d0a-9a3e-1f0c2b9d4e11"`
@@ -63,40 +67,17 @@ type RosterPlayerResponse struct {
 	JoinedAt      time.Time `json:"joined_at"`
 }
 
+// The newXResponse mappers copy fields by name; TestResponsesCopyEveryField fails if a
+// rename leaves a response field unfilled.
+
 func newTeamResponse(team Team) TeamResponse {
-	return TeamResponse{ //nolint:staticcheck // S1016: explicit mapping keeps the db row and JSON response independent
-		ID:              team.ID,
-		TeamCode:        team.TeamCode,
-		Name:            team.Name,
-		CaptainPlayerID: team.CaptainPlayerID,
-		VenueID:         team.VenueID,
-		CreatedAt:       team.CreatedAt,
-		UpdatedAt:       team.UpdatedAt,
-	}
+	return common.CopyFieldsByName[TeamResponse](&team)
 }
 
 func newDivisionTeamResponse(entry DivisionTeam) DivisionTeamResponse {
-	return DivisionTeamResponse{ //nolint:staticcheck // S1016: explicit mapping keeps the db row and JSON response independent
-		DivisionID: entry.DivisionID,
-		TeamID:     entry.TeamID,
-		CreatedAt:  entry.CreatedAt,
-	}
+	return common.CopyFieldsByName[DivisionTeamResponse](&entry)
 }
 
 func newRosterPlayerResponse(player RosterPlayer) RosterPlayerResponse {
-	return RosterPlayerResponse{ //nolint:staticcheck // S1016: explicit mapping keeps the db row and JSON response independent
-		RosterID:      player.RosterID,
-		DivisionID:    player.DivisionID,
-		TeamID:        player.TeamID,
-		PlayerID:      player.PlayerID,
-		MemberID:      player.MemberID,
-		FullName:      player.FullName,
-		SkillLevel:    player.SkillLevel,
-		IsPaid:        player.IsPaid,
-		IsCaptain:     player.IsCaptain,
-		MatchesPlayed: player.MatchesPlayed,
-		MatchesWon:    player.MatchesWon,
-		TotalPoints:   player.TotalPoints,
-		JoinedAt:      player.JoinedAt,
-	}
+	return common.CopyFieldsByName[RosterPlayerResponse](&player)
 }

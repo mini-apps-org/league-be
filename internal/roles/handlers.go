@@ -35,8 +35,10 @@ func (h *Handler) ListRoles(w http.ResponseWriter, r *http.Request) {
 		items = append(items, newRoleResponse(role))
 	}
 
-	total := int64(len(items))
-	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]RoleResponse]{Count: &total, Data: items})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]RoleResponse]{
+		Data:     items,
+		Metadata: handler.NewMetadata(len(items)),
+	})
 }
 
 // @Summary		Create a role

@@ -6,6 +6,7 @@ import (
 
 	"github.com/nguyentanvinh/league-be/internal/platform/config"
 	"github.com/nguyentanvinh/league-be/internal/platform/handler"
+	"github.com/nguyentanvinh/league-be/internal/platform/model"
 )
 
 type Handler struct {
@@ -17,35 +18,60 @@ func NewHandler(cfg *config.Config, service Service) Handler {
 	return Handler{Handler: handler.Handler{Config: cfg}, service: service}
 }
 
-// @Summary	List teams
-// @Tags		teams
-// @Produce	json
-// @Param		division_id	query		string	false	"only teams entered in this division (uuid)"
-// @Success	200			{object}	handler.SuccessResponse[[]teams.TeamResponse]
-// @Failure	400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure	401			{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID"
-// @Failure	403			{object}	handler.ErrorResponse	"40305 PERMISSION_DENIED"
-// @Router		/teams [get]
+// @Summary		List teams
+// @Description	Paged: `limit` rows per page (default 10). Pass `metadata.next_cursor` back as `cursor` for the next page, with the same filters and sort; it is null on the last page. `metadata.total` (rows matching the filters) is sent on the first page only.
+// @Tags			teams
+// @Produce		json
+// @Param			division_id	query		string	false	"only teams entered in this division (uuid)"
+// @Param			venue_id	query		string	false	"only teams hosted at this venue (uuid)"
+// @Param			q			query		string	false	"search: name or team_code contains this, case-insensitive"
+// @Param			sort		query		string	false	"sort field, - prefix for descending (default team_code)"	Enums(team_code, -team_code, name, -name, created_at, -created_at)
+// @Param			limit		query		int		false	"rows per page, 1-200 (default 10)"
+// @Param			cursor		query		string	false	"metadata.next_cursor of the previous page"
+// @Success		200			{object}	handler.SuccessResponse[[]teams.TeamResponse]
+// @Failure		400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
+// @Failure		401			{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID"
+// @Failure		403			{object}	handler.ErrorResponse	"40305 PERMISSION_DENIED"
+// @Router			/teams [get]
 func (h *Handler) ListTeams(w http.ResponseWriter, r *http.Request) {
-	teams, err := h.service.ListTeams(r.Context(), ListTeamsServiceParams{
-		DivisionID: r.URL.Query().Get("division_id"),
+	query := r.URL.Query()
+
+	sort, err := model.ParseSort(query.Get("sort"), teamSortFields, TeamSortByTeamCode)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+	limit, err := model.ParseLimit(query.Get("limit"))
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	page, err := h.service.ListTeams(r.Context(), ListTeamsServiceParams{
+		DivisionID: query.Get("division_id"),
+		VenueID:    query.Get("venue_id"),
+		Query:      query.Get("q"),
+		Sort:       sort,
+		Page:       model.CursorParams{Limit: limit, Cursor: query.Get("cursor")},
 	})
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}
 
-	items := make([]TeamResponse, 0, len(teams))
-	for _, team := range teams {
+	items := make([]TeamResponse, 0, len(page.Items))
+	for _, team := range page.Items {
 		items = append(items, newTeamResponse(team))
 	}
 
-	total := int64(len(items))
-	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]TeamResponse]{Count: &total, Data: items})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]TeamResponse]{
+		Data:     items,
+		Metadata: handler.NewPageMetadata(len(items), page.Total, page.NextCursor),
+	})
 }
 
 // @Summary		Create a team
-// @Description	`division_id` is required: a team is created in a division. `team_code` is the team code XXyyA (region, host location, team sequence), unique within the division; lower case is accepted and stored upper case. The team then enters a division with POST /teams/{id}/divisions, and the captain is set with PATCH once the player is on the roster.
+// @Description	`division_id` is required: the team is created in that division and entered into it. `team_code` is the team code XXyyA (region, host location, team sequence), unique within the division; lower case is accepted and stored upper case. It can enter further divisions with POST /teams/{id}/divisions, and the captain is set with PATCH once the player is on the roster.
 // @Tags			teams
 // @Accept			json
 // @Produce		json
@@ -85,14 +111,14 @@ func (h *Handler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 // @Failure	400	{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure	404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
 // @Router		/teams/{id} [get]
-func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetTeamByID(w http.ResponseWriter, r *http.Request) {
 	id, err := handler.ParsePathUUID(r, "id")
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}
 
-	team, err := h.service.GetTeam(r.Context(), id)
+	team, err := h.service.GetTeamByID(r.Context(), id)
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
@@ -150,14 +176,14 @@ func (h *Handler) UpdateTeam(w http.ResponseWriter, r *http.Request) {
 // @Failure		404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
 // @Security		CSRFToken
 // @Router			/teams/{id} [delete]
-func (h *Handler) DeleteTeam(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteTeamByID(w http.ResponseWriter, r *http.Request) {
 	id, err := handler.ParsePathUUID(r, "id")
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}
 
-	if err := h.service.DeleteTeam(r.Context(), id); err != nil {
+	if err := h.service.DeleteTeamByID(r.Context(), id); err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}
@@ -175,14 +201,14 @@ func (h *Handler) DeleteTeam(w http.ResponseWriter, r *http.Request) {
 // @Failure		409	{object}	handler.ErrorResponse	"40901 CONFLICT (not deleted yet, or team has matches)"
 // @Security		CSRFToken
 // @Router			/teams/{id}/permanent [delete]
-func (h *Handler) HardDeleteTeam(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PermanentDeleteTeam(w http.ResponseWriter, r *http.Request) {
 	id, err := handler.ParsePathUUID(r, "id")
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}
 
-	if err := h.service.HardDeleteTeam(r.Context(), id); err != nil {
+	if err := h.service.PermanentDeleteTeam(r.Context(), id); err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}
@@ -258,11 +284,15 @@ func (h *Handler) RemoveDivisionTeam(w http.ResponseWriter, r *http.Request) {
 }
 
 // @Summary		List a team's roster in a division
-// @Description	Active players only, with their stats in the division (zero before the first match).
+// @Description	Active players only, with their stats in the division (zero before the first match). Paged: `limit` rows per page (default 10); pass `metadata.next_cursor` back as `cursor`, with the same search and sort; it is null on the last page. `metadata.total` (rows matching the filters) is sent on the first page only.
 // @Tags			rosters
 // @Produce		json
 // @Param			id			path		string	true	"team id (uuid)"
 // @Param			division_id	query		string	true	"division id (uuid)"
+// @Param			q			query		string	false	"search: full_name or member_id contains this, case-insensitive"
+// @Param			sort		query		string	false	"sort field, - prefix for descending (default full_name)"	Enums(full_name, -full_name, member_id, -member_id, skill_level, -skill_level, matches_played, -matches_played, matches_won, -matches_won, total_points, -total_points, joined_at, -joined_at)
+// @Param			limit		query		int		false	"rows per page, 1-200 (default 10)"
+// @Param			cursor		query		string	false	"metadata.next_cursor of the previous page"
 // @Success		200			{object}	handler.SuccessResponse[[]teams.RosterPlayerResponse]
 // @Failure		400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure		404			{object}	handler.ErrorResponse	"40401 NOT_FOUND (team has not entered the division)"
@@ -274,19 +304,40 @@ func (h *Handler) ListRosterPlayers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	players, err := h.service.ListRosterPlayers(r.Context(), r.URL.Query().Get("division_id"), teamID)
+	query := r.URL.Query()
+
+	sort, err := model.ParseSort(query.Get("sort"), rosterSortFields, RosterSortByFullName)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+	limit, err := model.ParseLimit(query.Get("limit"))
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}
 
-	items := make([]RosterPlayerResponse, 0, len(players))
-	for _, player := range players {
+	page, err := h.service.ListRosterPlayers(r.Context(), ListRosterPlayersServiceParams{
+		DivisionID: query.Get("division_id"),
+		TeamID:     teamID,
+		Query:      query.Get("q"),
+		Sort:       sort,
+		Page:       model.CursorParams{Limit: limit, Cursor: query.Get("cursor")},
+	})
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	items := make([]RosterPlayerResponse, 0, len(page.Items))
+	for _, player := range page.Items {
 		items = append(items, newRosterPlayerResponse(player))
 	}
 
-	total := int64(len(items))
-	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]RosterPlayerResponse]{Count: &total, Data: items})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]RosterPlayerResponse]{
+		Data:     items,
+		Metadata: handler.NewPageMetadata(len(items), page.Total, page.NextCursor),
+	})
 }
 
 // @Summary		Add a player to a team's roster in a division

@@ -60,7 +60,12 @@ Retired codes (`40002`, `40303`) stay retired and are marked as such in the file
 
 ## 3. HTTP
 
-- Success body is always `config.SuccessResponse{Data: ...}` via `h.ReturnWithJSON`.
+- Success body is always `handler.SuccessResponse[T]{Data: ...}` via `h.ReturnWithJSON`
+  (`internal/platform/handler/response.go`, beside `ErrorResponse`). A single item is
+  `{"data": {…}}`. A list adds `metadata`, built with `handler.NewMetadata(len(items))`
+  or, when paged, `handler.NewPageMetadata(len(items), page.Total, page.NextCursor)`:
+  `{"data": […], "metadata": {"count": 10, "total": 87, "has_more": true, "next_cursor": "…"}}`
+  — `total` on the first page only, `next_cursor` only while `has_more`.
 - Request bodies go through `h.DecodeJSON` — it caps the body and rejects unknown fields.
 - List endpoints page by keyset. Call `model.CursorParams.Normalise()` in the service
   so an unbounded scan cannot be requested.

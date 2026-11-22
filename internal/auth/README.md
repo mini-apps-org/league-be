@@ -137,7 +137,8 @@ Everything is mounted under `PrefixAPIV1` = `/api/v1` (`internal/platform/router
 
 Errors use the shared envelope from `internal/platform/handler/error.go`:
 `{"error":{"code":"40102","message":"Your session has expired. Please sign in again."}}`. Success
-responses are wrapped in `handler.SuccessResponse` (`session_id`, `count`, `data`, `metadata`).
+responses are wrapped in `handler.SuccessResponse` (`data`, plus `metadata` on lists). The
+session id is never in a body: `sid` is `HttpOnly` so page scripts cannot read it.
 
 **Codes are 5-digit strings**, not slugs: the first three digits are the HTTP status, the last two
 the case within it. The frontend switches on the string, so a code may be added but never reassigned.

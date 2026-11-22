@@ -36,8 +36,10 @@ func (h *Handler) ListPermissions(w http.ResponseWriter, r *http.Request) {
 		items = append(items, newPermissionResponse(permission))
 	}
 
-	total := int64(len(items))
-	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]PermissionResponse]{Count: &total, Data: items})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]PermissionResponse]{
+		Data:     items,
+		Metadata: handler.NewMetadata(len(items)),
+	})
 }
 
 // @Summary	Get a permission
