@@ -21,7 +21,7 @@ func NewHandler(cfg *config.Config, service Service) Handler {
 // @Tags		teams
 // @Produce	json
 // @Param		division_id	query		string	false	"only teams entered in this division (uuid)"
-// @Success	200			{object}	config.SuccessResponse{data=[]teams.TeamResponse}
+// @Success	200			{object}	handler.SuccessResponse[[]teams.TeamResponse]
 // @Failure	400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure	401			{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID"
 // @Failure	403			{object}	handler.ErrorResponse	"40305 PERMISSION_DENIED"
@@ -41,7 +41,7 @@ func (h *Handler) ListTeams(w http.ResponseWriter, r *http.Request) {
 	}
 
 	total := int64(len(items))
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Count: &total, Data: items})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]TeamResponse]{Count: &total, Data: items})
 }
 
 // @Summary		Create a team
@@ -50,7 +50,7 @@ func (h *Handler) ListTeams(w http.ResponseWriter, r *http.Request) {
 // @Accept			json
 // @Produce		json
 // @Param			body	body		teams.CreateTeamRequest	true	"team to create"
-// @Success		201		{object}	config.SuccessResponse{data=teams.TeamResponse}
+// @Success		201		{object}	handler.SuccessResponse[teams.TeamResponse]
 // @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure		403		{object}	handler.ErrorResponse	"40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED"
 // @Failure		409		{object}	handler.ErrorResponse	"40901 CONFLICT (team_code taken)"
@@ -74,14 +74,14 @@ func (h *Handler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ReturnWithJSON(w, http.StatusCreated, config.SuccessResponse{Data: newTeamResponse(*team)})
+	h.ReturnWithJSON(w, http.StatusCreated, handler.SuccessResponse[TeamResponse]{Data: newTeamResponse(*team)})
 }
 
 // @Summary	Get a team
 // @Tags		teams
 // @Produce	json
 // @Param		id	path		string	true	"team id (uuid)"
-// @Success	200	{object}	config.SuccessResponse{data=teams.TeamResponse}
+// @Success	200	{object}	handler.SuccessResponse[teams.TeamResponse]
 // @Failure	400	{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure	404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
 // @Router		/teams/{id} [get]
@@ -98,7 +98,7 @@ func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Data: newTeamResponse(*team)})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[TeamResponse]{Data: newTeamResponse(*team)})
 }
 
 // @Summary		Update a team
@@ -108,7 +108,7 @@ func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
 // @Produce		json
 // @Param			id		path		string					true	"team id (uuid)"
 // @Param			body	body		teams.UpdateTeamRequest	true	"fields to change"
-// @Success		200		{object}	config.SuccessResponse{data=teams.TeamResponse}
+// @Success		200		{object}	handler.SuccessResponse[teams.TeamResponse]
 // @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure		404		{object}	handler.ErrorResponse	"40401 NOT_FOUND"
 // @Failure		409		{object}	handler.ErrorResponse	"40901 CONFLICT (team_code taken)"
@@ -138,7 +138,7 @@ func (h *Handler) UpdateTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Data: newTeamResponse(*team)})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[TeamResponse]{Data: newTeamResponse(*team)})
 }
 
 // @Summary		Delete a team
@@ -197,7 +197,7 @@ func (h *Handler) HardDeleteTeam(w http.ResponseWriter, r *http.Request) {
 // @Produce		json
 // @Param			id		path		string							true	"team id (uuid)"
 // @Param			body	body		teams.AddDivisionTeamRequest	true	"division to enter"
-// @Success		201		{object}	config.SuccessResponse{data=teams.DivisionTeamResponse}
+// @Success		201		{object}	handler.SuccessResponse[teams.DivisionTeamResponse]
 // @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure		404		{object}	handler.ErrorResponse	"40401 NOT_FOUND"
 // @Failure		409		{object}	handler.ErrorResponse	"40901 CONFLICT (already entered)"
@@ -222,7 +222,7 @@ func (h *Handler) AddDivisionTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ReturnWithJSON(w, http.StatusCreated, config.SuccessResponse{Data: newDivisionTeamResponse(*entry)})
+	h.ReturnWithJSON(w, http.StatusCreated, handler.SuccessResponse[DivisionTeamResponse]{Data: newDivisionTeamResponse(*entry)})
 }
 
 // @Summary		Withdraw a team from a division
@@ -263,7 +263,7 @@ func (h *Handler) RemoveDivisionTeam(w http.ResponseWriter, r *http.Request) {
 // @Produce		json
 // @Param			id			path		string	true	"team id (uuid)"
 // @Param			division_id	query		string	true	"division id (uuid)"
-// @Success		200			{object}	config.SuccessResponse{data=[]teams.RosterPlayerResponse}
+// @Success		200			{object}	handler.SuccessResponse[[]teams.RosterPlayerResponse]
 // @Failure		400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure		404			{object}	handler.ErrorResponse	"40401 NOT_FOUND (team has not entered the division)"
 // @Router			/teams-roster/{id} [get]
@@ -286,7 +286,7 @@ func (h *Handler) ListRosterPlayers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	total := int64(len(items))
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Count: &total, Data: items})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]RosterPlayerResponse]{Count: &total, Data: items})
 }
 
 // @Summary		Add a player to a team's roster in a division
@@ -297,7 +297,7 @@ func (h *Handler) ListRosterPlayers(w http.ResponseWriter, r *http.Request) {
 // @Param			id			path		string							true	"team id (uuid)"
 // @Param			division_id	query		string							true	"division id (uuid)"
 // @Param			body		body		teams.AddRosterPlayerRequest	true	"player to add"
-// @Success		201			{object}	config.SuccessResponse{data=teams.RosterPlayerResponse}
+// @Success		201			{object}	handler.SuccessResponse[teams.RosterPlayerResponse]
 // @Failure		400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure		404			{object}	handler.ErrorResponse	"40401 NOT_FOUND (player, or team has not entered the division)"
 // @Failure		409			{object}	handler.ErrorResponse	"40901 CONFLICT (already on a roster in the division)"
@@ -333,7 +333,7 @@ func (h *Handler) AddRosterPlayer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ReturnWithJSON(w, http.StatusCreated, config.SuccessResponse{Data: newRosterPlayerResponse(*player)})
+	h.ReturnWithJSON(w, http.StatusCreated, handler.SuccessResponse[RosterPlayerResponse]{Data: newRosterPlayerResponse(*player)})
 }
 
 // @Summary		Transfer a player to another team
@@ -345,7 +345,7 @@ func (h *Handler) AddRosterPlayer(w http.ResponseWriter, r *http.Request) {
 // @Param			player_id	path		string								true	"player id (uuid)"
 // @Param			division_id	query		string								true	"current division id (uuid)"
 // @Param			body		body		teams.TransferRosterPlayerRequest	true	"target team and division"
-// @Success		200			{object}	config.SuccessResponse{data=teams.RosterPlayerResponse}
+// @Success		200			{object}	handler.SuccessResponse[teams.RosterPlayerResponse]
 // @Failure		400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure		404			{object}	handler.ErrorResponse	"40401 NOT_FOUND (team, roster entry, or target team has not entered the division)"
 // @Failure		409			{object}	handler.ErrorResponse	"40901 CONFLICT (captain, or already on a roster in the target division)"
@@ -390,7 +390,7 @@ func (h *Handler) TransferRosterPlayer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Data: newRosterPlayerResponse(*player)})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[RosterPlayerResponse]{Data: newRosterPlayerResponse(*player)})
 }
 
 // @Summary		Remove a player from a team's roster in a division

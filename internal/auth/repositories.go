@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/nguyentanvinh/league-be/internal/platform/handler/repo"
 )
 
@@ -32,10 +34,11 @@ type Repository interface {
 
 type repository struct {
 	pgPool *pgxpool.Pool
+	logger *slog.Logger
 }
 
-func NewRepo(pool *pgxpool.Pool) Repository {
-	return &repository{pgPool: pool}
+func NewRepo(pool *pgxpool.Pool, logger *slog.Logger) Repository {
+	return &repository{pgPool: pool, logger: logger.With(slog.String("component", "auth.repository"))}
 }
 
 // UpsertGoogleIdentity grants signUpRoleCode in the same statement that inserts

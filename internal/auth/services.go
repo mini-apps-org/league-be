@@ -36,9 +36,10 @@ type service struct {
 	sealer     *secret.Box
 	sessionTTL time.Duration
 	idleTTL    time.Duration
+	logger     *slog.Logger
 }
 
-func NewService(config *config.Config, google IdentityProvider, repo Repository, sealer *secret.Box) Service {
+func NewService(config *config.Config, google IdentityProvider, repo Repository, sealer *secret.Box, logger *slog.Logger) Service {
 	return &service{
 		google:     google,
 		repo:       repo,
@@ -46,6 +47,7 @@ func NewService(config *config.Config, google IdentityProvider, repo Repository,
 		sealer:     sealer,
 		sessionTTL: config.Auth.SessionTTL,
 		idleTTL:    config.Auth.SessionIdleTTL,
+		logger:     logger.With(slog.String("component", "auth.service")),
 	}
 }
 
@@ -160,9 +162,9 @@ func (s *service) StartSessionCleanup(ctx context.Context) {
 	sweep := func() {
 		now := time.Now()
 		if deleted, err := s.repo.DeleteExpiredSessions(ctx, now.Add(-s.sessionTTL), now.Add(-s.idleTTL)); err != nil {
-			slog.Error("auth: session cleanup failed", "err", err)
+			s.logger.ErrorContext(ctx, "auth: session cleanup failed", "err", err)
 		} else if deleted > 0 {
-			slog.Info("auth: session cleanup swept", "deleted", deleted)
+			s.logger.InfoContext(ctx, "auth: session cleanup swept", "deleted", deleted)
 		}
 	}
 

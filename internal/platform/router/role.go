@@ -14,8 +14,8 @@ import (
 func (r *Router) registerRoleRoute(api *mux.Router, mw middleware.Middleware, permissionService permissions.Service) {
 	permissionHandler := permissions.NewHandler(r.Config, permissionService)
 
-	roleRepo := roles.NewRepo(r.Pool)
-	roleService := roles.NewService(roleRepo)
+	roleRepo := roles.NewRepo(r.Pool, r.Logger)
+	roleService := roles.NewService(roleRepo, r.Logger)
 	roleHandler := roles.NewHandler(r.Config, roleService)
 
 	guard := func(feature config.PermissionFeature, next http.HandlerFunc) http.Handler {

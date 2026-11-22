@@ -2,16 +2,18 @@ package router
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	httpSwagger "github.com/swaggo/http-swagger"
+
 	"github.com/nguyentanvinh/league-be/internal/auth"
 	"github.com/nguyentanvinh/league-be/internal/permissions"
 	"github.com/nguyentanvinh/league-be/internal/platform/config"
 	"github.com/nguyentanvinh/league-be/internal/platform/middleware"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 const (
@@ -24,6 +26,7 @@ const (
 type Router struct {
 	Config *config.Config
 	Pool   *pgxpool.Pool
+	Logger *slog.Logger // handed to every service and repository
 }
 
 func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
@@ -32,7 +35,7 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 		return nil, err
 	}
 
-	permissionService := permissions.NewService(permissions.NewRepo(r.Pool))
+	permissionService := permissions.NewService(permissions.NewRepo(r.Pool, r.Logger), r.Logger)
 
 	mw := middleware.New(r.Config, auth.CSRFCookieName(r.Config), authHandler, permissionService)
 

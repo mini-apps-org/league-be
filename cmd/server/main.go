@@ -55,7 +55,7 @@ func main() {
 	defer pool.Close()
 	slog.Info("database: connected", "target", cfg.RedactedDatabaseTarget())
 
-	routes, err := (&router.Router{Config: cfg, Pool: pool}).NewRouter(ctx)
+	routes, err := (&router.Router{Config: cfg, Pool: pool, Logger: configured}).NewRouter(ctx)
 	if err != nil {
 		slog.Error("router: build failed", "err", err)
 		os.Exit(1)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -29,11 +30,12 @@ type Service interface {
 }
 
 type service struct {
-	repo Repository
+	repo   Repository
+	logger *slog.Logger
 }
 
-func NewService(repo Repository) Service {
-	return &service{repo: repo}
+func NewService(repo Repository, logger *slog.Logger) Service {
+	return &service{repo: repo, logger: logger.With(slog.String("component", "roles.service"))}
 }
 
 func (s *service) CreateRole(ctx context.Context, params CreateRoleServiceParams) (*Role, error) {

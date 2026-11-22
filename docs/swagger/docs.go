@@ -131,19 +131,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/auth.CurrentUserResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-auth_CurrentUserResponse"
                         }
                     },
                     "401": {
@@ -169,22 +157,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/permissions.PermissionResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_permissions_PermissionResponse"
                         }
                     },
                     "401": {
@@ -224,19 +197,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/permissions.PermissionResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-permissions_PermissionResponse"
                         }
                     },
                     "400": {
@@ -267,22 +228,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/roles.RoleResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_roles_RoleResponse"
                         }
                     },
                     "401": {
@@ -331,19 +277,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/roles.RoleResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-roles_RoleResponse"
                         }
                     },
                     "400": {
@@ -389,19 +323,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/roles.RoleResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-roles_RoleResponse"
                         }
                     },
                     "400": {
@@ -424,7 +346,7 @@ const docTemplate = `{
                         "CSRFToken": []
                     }
                 ],
-                "description": "Cascades: rows in roles_permissions and users_roles go with it, so everyone holding this role loses what it granted. SUPER_ADMIN cannot be deleted.",
+                "description": "Soft delete: the role is hidden and everyone holding it loses what it granted at once. Its grants and holders are kept until DELETE /roles/{id}/permanent. SUPER_ADMIN cannot be deleted.",
                 "produces": [
                     "application/json"
                 ],
@@ -498,19 +420,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/roles.RoleResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-roles_RoleResponse"
                         }
                     },
                     "400": {
@@ -521,6 +431,49 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "40401 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/roles/{id}/permanent": {
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Only a role already deleted with DELETE /roles/{id}. Cascades: its rows in roles_permissions and users_roles are removed. Cannot be undone.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "roles"
+                ],
+                "summary": "Permanently delete a role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "role id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "permanently deleted"
+                    },
+                    "404": {
+                        "description": "40401 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "40901 CONFLICT (not deleted yet)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -549,22 +502,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/teams.TeamResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_teams_TeamResponse"
                         }
                     },
                     "400": {
@@ -619,19 +557,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/teams.TeamResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_TeamResponse"
                         }
                     },
                     "400": {
@@ -685,22 +611,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/teams.RosterPlayerResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_teams_RosterPlayerResponse"
                         }
                     },
                     "400": {
@@ -763,19 +674,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/teams.RosterPlayerResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_RosterPlayerResponse"
                         }
                     },
                     "400": {
@@ -926,19 +825,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/teams.RosterPlayerResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_RosterPlayerResponse"
                         }
                     },
                     "400": {
@@ -990,19 +877,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/teams.TeamResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_TeamResponse"
                         }
                     },
                     "400": {
@@ -1093,19 +968,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/teams.TeamResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_TeamResponse"
                         }
                     },
                     "400": {
@@ -1169,19 +1032,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/teams.DivisionTeamResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_DivisionTeamResponse"
                         }
                     },
                     "400": {
@@ -1350,16 +1201,14 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_nguyentanvinh_league-be_internal_platform_config.SuccessResponse": {
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata": {
             "type": "object",
             "properties": {
-                "count": {
-                    "type": "integer"
-                },
-                "data": {},
-                "metadata": {},
-                "session_id": {
+                "next_cursor": {
                     "type": "string"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
@@ -1420,6 +1269,188 @@ const docTemplate = `{
             "properties": {
                 "error": {
                     "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorBody"
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_permissions_PermissionResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/permissions.PermissionResponse"
+                    }
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_roles_RoleResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/roles.RoleResponse"
+                    }
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_teams_RosterPlayerResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/teams.RosterPlayerResponse"
+                    }
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_teams_TeamResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/teams.TeamResponse"
+                    }
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-auth_CurrentUserResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/auth.CurrentUserResponse"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-permissions_PermissionResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/permissions.PermissionResponse"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-roles_RoleResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/roles.RoleResponse"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_DivisionTeamResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/teams.DivisionTeamResponse"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_RosterPlayerResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/teams.RosterPlayerResponse"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_TeamResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/teams.TeamResponse"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
+                },
+                "session_id": {
+                    "type": "string"
                 }
             }
         },

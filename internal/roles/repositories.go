@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -40,10 +41,11 @@ type Repository interface {
 
 type repository struct {
 	pgPool *pgxpool.Pool
+	logger *slog.Logger
 }
 
-func NewRepo(pool *pgxpool.Pool) Repository {
-	return &repository{pgPool: pool}
+func NewRepo(pool *pgxpool.Pool, logger *slog.Logger) Repository {
+	return &repository{pgPool: pool, logger: logger.With(slog.String("component", "roles.repository"))}
 }
 
 func (r *repository) CreateRole(ctx context.Context, params CreateRoleServiceParams) (*Role, error) {

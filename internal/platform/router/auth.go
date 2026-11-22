@@ -22,8 +22,8 @@ func (r *Router) newAuthHandler(ctx context.Context) (*auth.Handler, error) {
 		return nil, fmt.Errorf("router: encryption key: %w", err)
 	}
 
-	authRepo := auth.NewRepo(r.Pool)
-	authService := auth.NewService(r.Config, googleAuth, authRepo, sealer)
+	authRepo := auth.NewRepo(r.Pool, r.Logger)
+	authService := auth.NewService(r.Config, googleAuth, authRepo, sealer, r.Logger)
 	authHandler := auth.NewHandler(r.Config, authService)
 
 	authService.StartSessionCleanup(ctx)
