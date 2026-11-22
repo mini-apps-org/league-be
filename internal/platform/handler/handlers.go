@@ -24,10 +24,8 @@ func (h *Handler) ReturnWithJSON(w http.ResponseWriter, statusCode int, v any) {
 		return
 	}
 
-	if resp, ok := v.(config.SuccessResponse); ok && resp.Count == nil {
-		one := int64(1)
-		resp.Count = &one
-		v = resp
+	if resp, ok := v.(responseWithDefaultCount); ok {
+		v = resp.withDefaultCount()
 	}
 
 	if err := json.NewEncoder(w).Encode(v); err != nil {

@@ -118,7 +118,7 @@ func (h *Handler) CallbackLogin(w http.ResponseWriter, r *http.Request) {
 //	@Summary	Current user
 //	@Tags		auth
 //	@Produce	json
-//	@Success	200	{object}	config.SuccessResponse{data=auth.CurrentUserResponse}
+//	@Success	200	{object}	handler.SuccessResponse[auth.CurrentUserResponse]
 //	@Failure	401	{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID | 40103 USER_NOT_IN_CONTEXT"
 //	@Router		/me [get]
 func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +141,7 @@ func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.setNoStoreHeader(w)
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Data: CurrentUserResponse{
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[CurrentUserResponse]{Data: CurrentUserResponse{
 		User:        newUserResponse(&user.User),
 		Roles:       user.Roles,
 		Permissions: user.Permissions,
