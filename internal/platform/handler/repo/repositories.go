@@ -57,3 +57,13 @@ func QueryStrings(ctx context.Context, pool *pgxpool.Pool, query string, args ..
 	}
 	return values, nil
 }
+
+// QueryCount runs a single-value count query, such as SELECT count(*) FROM … WHERE …, and
+// returns the count.
+func QueryCount(ctx context.Context, pool *pgxpool.Pool, query string, args ...any) (int64, error) {
+	var count int64
+	if err := pool.QueryRow(ctx, query, args...).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}

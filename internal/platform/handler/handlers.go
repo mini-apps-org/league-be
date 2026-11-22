@@ -24,12 +24,6 @@ func (h *Handler) ReturnWithJSON(w http.ResponseWriter, statusCode int, v any) {
 		return
 	}
 
-	if resp, ok := v.(config.SuccessResponse); ok && resp.Count == nil {
-		one := int64(1)
-		resp.Count = &one
-		v = resp
-	}
-
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		// The status is already on the wire, so logging is all that is left.
 		slog.Error("handler: encode response failed", "type", fmt.Sprintf("%T", v), "err", err)

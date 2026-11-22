@@ -3,6 +3,7 @@ package permissions
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/nguyentanvinh/league-be/internal/platform/handler"
 )
@@ -14,11 +15,12 @@ type Service interface {
 }
 
 type service struct {
-	repo Repository
+	repo   Repository
+	logger *slog.Logger
 }
 
-func NewService(repo Repository) Service {
-	return &service{repo: repo}
+func NewService(repo Repository, logger *slog.Logger) Service {
+	return &service{repo: repo, logger: logger.With(slog.String("component", "permissions.service"))}
 }
 
 func (s *service) ListPermissions(ctx context.Context) ([]Permission, error) {

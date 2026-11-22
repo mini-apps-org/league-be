@@ -1,9 +1,20 @@
 -- Development seed. Applied by `make seed`, not part of the schema.
 --
--- Natural keys (league name, session name, team number, member id) are used for every lookup
+-- Natural keys (league name, session name, team code, member id) are used for every lookup
 -- so the file never depends on generated uuids and can be re-read top to bottom.
 
 BEGIN;
+
+TRUNCATE TABLE
+	leagues,
+	league_sessions,
+	divisions,
+	venues,
+	teams,
+	players,
+	team_rosters,
+	team_matches
+RESTART IDENTITY CASCADE;
 
 
 INSERT INTO leagues (name, description, location, contact_email, timezone)
@@ -23,8 +34,8 @@ INSERT INTO venues (league_id, name, address)
 SELECT l.id, 'Saigon Cue Club', '12 Nguyen Hue, District 1, Ho Chi Minh City'
 FROM leagues l WHERE l.name = 'MVIP League';
 
-INSERT INTO teams (division_id, venue_id, team_number, name)
-SELECT d.id, v.id, t.team_number, t.name
+INSERT INTO teams (division_id, venue_id, team_code, name)
+SELECT d.id, v.id, t.team_code, t.name
 FROM divisions d
 CROSS JOIN venues v
 CROSS JOIN (VALUES
@@ -32,7 +43,7 @@ CROSS JOIN (VALUES
 	('03214', 'Eight Ball Bandits'),
 	('03211', 'Rack Attack'),
 	('03207', 'Side Pocket Social')
-) AS t (team_number, name)
+) AS t (team_code, name)
 WHERE d.name = '8-Ball Open' AND v.name = 'Saigon Cue Club';
 
 
@@ -44,7 +55,7 @@ CREATE TEMP TABLE seed_players (
 	full_name   TEXT,
 	skill_level SMALLINT,
 	is_paid     BOOLEAN,
-	team_number TEXT,
+	team_code TEXT,
 	is_captain  BOOLEAN
 ) ON COMMIT DROP;
 
@@ -93,14 +104,14 @@ SELECT member_id, full_name, skill_level, is_paid FROM seed_players;
 INSERT INTO team_rosters (team_id, player_id)
 SELECT t.id, p.id
 FROM seed_players sp
-JOIN teams t   ON t.team_number = sp.team_number
+JOIN teams t   ON t.team_code = sp.team_code
 JOIN players p ON p.member_id = sp.member_id;
 
 UPDATE teams t
 SET captain_player_id = p.id
 FROM seed_players sp
 JOIN players p ON p.member_id = sp.member_id
-WHERE sp.is_captain AND t.team_number = sp.team_number;
+WHERE sp.is_captain AND t.team_code = sp.team_code;
 
 
 -- Week 10, both fixtures on the same night at the one venue.
@@ -111,8 +122,8 @@ CROSS JOIN (VALUES
 	('03209', '03214', TIMESTAMPTZ '2026-11-10 19:30+07'),
 	('03211', '03207', TIMESTAMPTZ '2026-11-10 19:30+07')
 ) AS f (home, away, scheduled_at)
-JOIN teams h ON h.team_number = f.home
-JOIN teams a ON a.team_number = f.away
+JOIN teams h ON h.team_code = f.home
+JOIN teams a ON a.team_code = f.away
 CROSS JOIN venues v
 WHERE d.name = '8-Ball Open' AND v.name = 'Saigon Cue Club';
 

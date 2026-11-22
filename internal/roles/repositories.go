@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -13,8 +14,9 @@ import (
 )
 
 var (
-	ErrRoleNotFound      = errors.New("roles: not found")
-	ErrDuplicateRoleCode = errors.New("roles: duplicate code")
+	ErrRoleNotFound       = errors.New("roles: not found")
+	ErrDuplicateRoleCode  = errors.New("roles: duplicate code")
+	ErrRoleNotSoftDeleted = errors.New("roles: not soft-deleted")
 )
 
 // pgUniqueViolationCode is Postgres SQLSTATE 23505.
@@ -33,15 +35,17 @@ type Repository interface {
 	GetRoleByID(ctx context.Context, id string) (*Role, error)
 	ListRoles(ctx context.Context) ([]Role, error)
 	UpdateRole(ctx context.Context, id string, params UpdateRoleServiceParams) (*Role, error)
-	DeleteRole(ctx context.Context, id string) error
+	SoftDeleteRole(ctx context.Context, id string) error
+	PermanentDeleteRole(ctx context.Context, id string) error
 }
 
 type repository struct {
 	pgPool *pgxpool.Pool
+	logger *slog.Logger
 }
 
-func NewRepo(pool *pgxpool.Pool) Repository {
-	return &repository{pgPool: pool}
+func NewRepo(pool *pgxpool.Pool, logger *slog.Logger) Repository {
+	return &repository{pgPool: pool, logger: logger.With(slog.String("component", "roles.repository"))}
 }
 
 func (r *repository) CreateRole(ctx context.Context, params CreateRoleServiceParams) (*Role, error) {
@@ -66,7 +70,7 @@ RETURNING ` + roleColumns
 }
 
 func (r *repository) GetRoleByID(ctx context.Context, id string) (*Role, error) {
-	const query = `SELECT ` + roleColumns + ` FROM roles WHERE id = $1`
+	const query = `SELECT ` + roleColumns + ` FROM roles WHERE id = $1 AND NOT is_deleted`
 	args := []any{
 		id,
 	}
@@ -82,7 +86,7 @@ func (r *repository) GetRoleByID(ctx context.Context, id string) (*Role, error) 
 }
 
 func (r *repository) ListRoles(ctx context.Context) ([]Role, error) {
-	const query = `SELECT ` + roleColumns + ` FROM roles ORDER BY code LIMIT $1`
+	const query = `SELECT ` + roleColumns + ` FROM roles WHERE NOT is_deleted ORDER BY code LIMIT $1`
 	args := []any{
 		roleListLimit,
 	}
@@ -102,7 +106,7 @@ UPDATE roles SET
     name        = COALESCE($2, name),
     description = COALESCE($3, description),
     updated_at  = now()
-WHERE id = $1
+WHERE id = $1 AND NOT is_deleted
 RETURNING ` + roleColumns
 	args := []any{
 		id,                 // $1 id
@@ -120,20 +124,61 @@ RETURNING ` + roleColumns
 	return role, nil
 }
 
-func (r *repository) DeleteRole(ctx context.Context, id string) error {
-	const query = `DELETE FROM roles WHERE id = $1`
+// SoftDeleteRole hides the role and stops it granting anything: every permission lookup
+// joins roles on NOT is_deleted. Its grants stay, so the role is whole if restored.
+func (r *repository) SoftDeleteRole(ctx context.Context, id string) error {
+	const query = `
+UPDATE roles SET
+    is_deleted = true,
+    updated_at = now()
+WHERE id = $1 AND NOT is_deleted`
 	args := []any{
 		id,
 	}
 
 	tag, err := r.pgPool.Exec(ctx, query, args...)
 	if err != nil {
-		return fmt.Errorf("roles: delete %s: %w", id, err)
+		return fmt.Errorf("roles: soft delete %s: %w", id, err)
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrRoleNotFound
 	}
 	return nil
+}
+
+// PermanentDeleteRole removes a soft-deleted role; rows in roles_permissions and users_roles
+// cascade with it.
+func (r *repository) PermanentDeleteRole(ctx context.Context, id string) error {
+	const query = `DELETE FROM roles WHERE id = $1 AND is_deleted`
+	args := []any{
+		id,
+	}
+
+	tag, err := r.pgPool.Exec(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("roles: permanently delete %s: %w", id, err)
+	}
+	if tag.RowsAffected() > 0 {
+		return nil
+	}
+	return r.missingOrLiveRoleError(ctx, id)
+}
+
+// missingOrLiveRoleError explains why a permanent delete matched nothing.
+func (r *repository) missingOrLiveRoleError(ctx context.Context, id string) error {
+	const query = `SELECT EXISTS (SELECT 1 FROM roles WHERE id = $1)`
+	args := []any{
+		id,
+	}
+
+	var exists bool
+	if err := r.pgPool.QueryRow(ctx, query, args...).Scan(&exists); err != nil {
+		return fmt.Errorf("roles: check role %s: %w", id, err)
+	}
+	if exists {
+		return ErrRoleNotSoftDeleted
+	}
+	return ErrRoleNotFound
 }
 
 func isUniqueViolation(err error) bool {

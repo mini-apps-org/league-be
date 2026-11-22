@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,10 +26,11 @@ type Repository interface {
 
 type repository struct {
 	pgPool *pgxpool.Pool
+	logger *slog.Logger
 }
 
-func NewRepo(pool *pgxpool.Pool) Repository {
-	return &repository{pgPool: pool}
+func NewRepo(pool *pgxpool.Pool, logger *slog.Logger) Repository {
+	return &repository{pgPool: pool, logger: logger.With(slog.String("component", "permissions.repository"))}
 }
 
 func (r *repository) GetPermissionByID(ctx context.Context, id string) (*Permission, error) {
@@ -64,6 +66,7 @@ func (r *repository) GetPermissionCodesByUserID(ctx context.Context, userID stri
 	const query = `
 SELECT DISTINCT p.code
 FROM users_roles ur
+JOIN roles ro             ON ro.id = ur.role_id AND NOT ro.is_deleted
 JOIN roles_permissions rp ON rp.role_id = ur.role_id
 JOIN permissions p        ON p.id = rp.permission_id
 WHERE ur.user_id = $1

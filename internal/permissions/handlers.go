@@ -20,7 +20,7 @@ func NewHandler(cfg *config.Config, service Service) Handler {
 // @Description	The catalog is a fixed vocabulary, returned whole. It is read-only over HTTP: codes are compared by authorization code elsewhere in the backend, so they are added and removed by migration.
 // @Tags			permissions
 // @Produce		json
-// @Success		200	{object}	config.SuccessResponse{data=[]permissions.PermissionResponse}
+// @Success		200	{object}	handler.SuccessResponse[[]permissions.PermissionResponse]
 // @Failure		401	{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID"
 // @Failure		403	{object}	handler.ErrorResponse	"40305 PERMISSION_DENIED"
 // @Router			/permissions [get]
@@ -36,15 +36,17 @@ func (h *Handler) ListPermissions(w http.ResponseWriter, r *http.Request) {
 		items = append(items, newPermissionResponse(permission))
 	}
 
-	total := int64(len(items))
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Count: &total, Data: items})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]PermissionResponse]{
+		Data:     items,
+		Metadata: handler.NewMetadata(len(items)),
+	})
 }
 
 // @Summary	Get a permission
 // @Tags		permissions
 // @Produce	json
 // @Param		id	path		string	true	"permission id (uuid)"
-// @Success	200	{object}	config.SuccessResponse{data=permissions.PermissionResponse}
+// @Success	200	{object}	handler.SuccessResponse[permissions.PermissionResponse]
 // @Failure	400	{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure	404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
 // @Router		/permissions/{id} [get]
@@ -61,5 +63,5 @@ func (h *Handler) GetPermissionByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Data: newPermissionResponse(*permission)})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[PermissionResponse]{Data: newPermissionResponse(*permission)})
 }

@@ -109,7 +109,9 @@ CREATE TABLE IF NOT EXISTS players (
 	id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
 	-- Optional account link; most players never sign in.
 	user_id      TEXT        UNIQUE REFERENCES users (id) ON DELETE SET NULL,
-	member_id    TEXT        NOT NULL UNIQUE,         -- External membership ID
+	-- External membership id, assigned by hand; '' until then. Unique once assigned, through
+	-- players_member_id_key below rather than a UNIQUE here, which would allow one '' only.
+	member_id    TEXT        NOT NULL DEFAULT '',
 	full_name    TEXT        NOT NULL,
 	skill_level  SMALLINT    NOT NULL DEFAULT 3 CHECK (skill_level BETWEEN 2 AND 7),
 	is_paid      BOOLEAN     NOT NULL DEFAULT false,  -- Captains may add only paid members
@@ -117,40 +119,64 @@ CREATE TABLE IF NOT EXISTS players (
 	updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Any number of players may wait for a member id (''); an assigned one is never reused.
+CREATE UNIQUE INDEX IF NOT EXISTS players_member_id_key
+	ON players (member_id) WHERE member_id <> '';
+
 CREATE TABLE IF NOT EXISTS teams (
 	id                 UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
 	division_id        UUID        NOT NULL REFERENCES divisions (id) ON DELETE CASCADE,
-	team_number        TEXT        NOT NULL,  -- External team number
+	team_code          TEXT        NOT NULL,  -- External team code, XXyyA
 	name               TEXT        NOT NULL,
 	captain_player_id  UUID        REFERENCES players (id),
 	venue_id           UUID        REFERENCES venues (id) ON DELETE SET NULL,
+  is_deleted         BOOLEAN NOT NULL DEFAULT false,
 	created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-	UNIQUE (division_id, team_number)
+	-- Named so a database created here and one migrated by 20261122-4 agree; the code maps
+	-- this name to a 409.
+	CONSTRAINT teams_division_id_team_code_key UNIQUE (division_id, team_code)
 );
 
--- Historical roster membership. Transfers close the old row and create a new
--- one, preserving match history. Eligibility rules are enforced by the service layer.
-CREATE TABLE IF NOT EXISTS team_rosters (
-	id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-	team_id     UUID        NOT NULL REFERENCES teams (id) ON DELETE CASCADE,
-	player_id   UUID        NOT NULL REFERENCES players (id) ON DELETE CASCADE,
-	joined_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-	left_at     TIMESTAMPTZ,  -- NULL means currently active
-	created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-	updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+-- One row per season a team plays. Rosters and fixtures reference this, not teams, so a
+-- team has neither in a division it never entered.
+CREATE TABLE IF NOT EXISTS division_teams (
+	division_id  UUID        NOT NULL REFERENCES divisions (id) ON DELETE CASCADE,
+	team_id      UUID        NOT NULL REFERENCES teams (id) ON DELETE CASCADE,
+	created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+	PRIMARY KEY (division_id, team_id)
+);
+
+-- Supports a team's season history.
+CREATE INDEX IF NOT EXISTS division_teams_team_id_idx ON division_teams (team_id);
+
+-- Historical roster membership of a team within a division. Transfers close the old row
+-- and create a new one, preserving match history.
+CREATE TABLE IF NOT EXISTS team_rosters (
+	id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+	division_id  UUID        NOT NULL,
+	team_id      UUID        NOT NULL,
+	player_id    UUID        NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+	joined_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+	left_at      TIMESTAMPTZ,  -- NULL means currently active
+	created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+	CONSTRAINT team_rosters_division_team_fkey
+		FOREIGN KEY (division_id, team_id) REFERENCES division_teams (division_id, team_id) ON DELETE CASCADE,
 	UNIQUE (team_id, player_id, joined_at),
 	CHECK (left_at IS NULL OR left_at > joined_at)
 );
 
--- Supports lookups of a team's current players and a player's current team.
-CREATE INDEX IF NOT EXISTS team_rosters_team_id_active_idx
-	ON team_rosters (team_id) WHERE left_at IS NULL;
+-- One active team per player per division, enforced here rather than by a check-then-insert.
+CREATE UNIQUE INDEX IF NOT EXISTS team_rosters_player_id_division_id_active_key
+	ON team_rosters (player_id, division_id) WHERE left_at IS NULL;
 
-CREATE INDEX IF NOT EXISTS team_rosters_player_id_active_idx
-	ON team_rosters (player_id) WHERE left_at IS NULL;
+-- Supports lookups of a team's current players in a division.
+CREATE INDEX IF NOT EXISTS team_rosters_division_id_team_id_active_idx
+	ON team_rosters (division_id, team_id) WHERE left_at IS NULL;
 
 -- Audit trail for skill-level changes.
 CREATE TABLE IF NOT EXISTS skill_level_history (
@@ -210,6 +236,12 @@ CREATE TABLE IF NOT EXISTS team_matches (
 	created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+	-- Both teams must have entered the division. No ON DELETE: a team with a fixture can
+	-- be neither withdrawn from the division nor permanently deleted.
+	CONSTRAINT team_matches_home_division_team_fkey
+		FOREIGN KEY (division_id, home_team_id) REFERENCES division_teams (division_id, team_id),
+	CONSTRAINT team_matches_away_division_team_fkey
+		FOREIGN KEY (division_id, away_team_id) REFERENCES division_teams (division_id, team_id),
 	CHECK (home_team_id <> away_team_id)
 );
 
@@ -296,6 +328,8 @@ CREATE TABLE IF NOT EXISTS roles (
 	code         VARCHAR(50) NOT NULL UNIQUE,
 	name         TEXT        NOT NULL,
 	description  TEXT,
+	-- A soft-deleted role grants nothing: every permission lookup joins roles on NOT is_deleted.
+	is_deleted   BOOLEAN     NOT NULL DEFAULT false,
 	created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );

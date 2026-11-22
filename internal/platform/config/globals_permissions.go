@@ -11,6 +11,8 @@ type PermissionFeature string
 const (
 	PermissionFeatureRoles       PermissionFeature = "ROLE"
 	PermissionFeaturePermissions PermissionFeature = "PERMISSION"
+	PermissionFeatureTeams       PermissionFeature = "TEAM"
+	PermissionFeatureTeamRosters PermissionFeature = "ROSTER"
 )
 
 type PermissionAction string

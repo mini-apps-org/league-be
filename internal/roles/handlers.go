@@ -19,7 +19,7 @@ func NewHandler(cfg *config.Config, service Service) Handler {
 // @Summary	List roles
 // @Tags		roles
 // @Produce	json
-// @Success	200	{object}	config.SuccessResponse{data=[]roles.RoleResponse}
+// @Success	200	{object}	handler.SuccessResponse[[]roles.RoleResponse]
 // @Failure	401	{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID"
 // @Failure	403	{object}	handler.ErrorResponse	"40305 PERMISSION_DENIED"
 // @Router		/roles [get]
@@ -35,8 +35,10 @@ func (h *Handler) ListRoles(w http.ResponseWriter, r *http.Request) {
 		items = append(items, newRoleResponse(role))
 	}
 
-	total := int64(len(items))
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Count: &total, Data: items})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]RoleResponse]{
+		Data:     items,
+		Metadata: handler.NewMetadata(len(items)),
+	})
 }
 
 // @Summary		Create a role
@@ -45,7 +47,7 @@ func (h *Handler) ListRoles(w http.ResponseWriter, r *http.Request) {
 // @Accept			json
 // @Produce		json
 // @Param			body	body		roles.CreateRoleRequest	true	"role to create"
-// @Success		201		{object}	config.SuccessResponse{data=roles.RoleResponse}
+// @Success		201		{object}	handler.SuccessResponse[roles.RoleResponse]
 // @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure		403		{object}	handler.ErrorResponse	"40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED"
 // @Failure		409		{object}	handler.ErrorResponse	"40901 CONFLICT"
@@ -68,14 +70,14 @@ func (h *Handler) CreateRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ReturnWithJSON(w, http.StatusCreated, config.SuccessResponse{Data: newRoleResponse(*role)})
+	h.ReturnWithJSON(w, http.StatusCreated, handler.SuccessResponse[RoleResponse]{Data: newRoleResponse(*role)})
 }
 
 // @Summary	Get a role
 // @Tags		roles
 // @Produce	json
 // @Param		id	path		string	true	"role id (uuid)"
-// @Success	200	{object}	config.SuccessResponse{data=roles.RoleResponse}
+// @Success	200	{object}	handler.SuccessResponse[roles.RoleResponse]
 // @Failure	400	{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure	404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
 // @Router		/roles/{id} [get]
@@ -92,7 +94,7 @@ func (h *Handler) GetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Data: newRoleResponse(*role)})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[RoleResponse]{Data: newRoleResponse(*role)})
 }
 
 // @Summary		Update a role
@@ -102,7 +104,7 @@ func (h *Handler) GetRole(w http.ResponseWriter, r *http.Request) {
 // @Produce		json
 // @Param			id		path		string					true	"role id (uuid)"
 // @Param			body	body		roles.UpdateRoleRequest	true	"fields to change"
-// @Success		200		{object}	config.SuccessResponse{data=roles.RoleResponse}
+// @Success		200		{object}	handler.SuccessResponse[roles.RoleResponse]
 // @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
 // @Failure		404		{object}	handler.ErrorResponse	"40401 NOT_FOUND"
 // @Security		CSRFToken
@@ -129,11 +131,11 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ReturnWithJSON(w, http.StatusOK, config.SuccessResponse{Data: newRoleResponse(*role)})
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[RoleResponse]{Data: newRoleResponse(*role)})
 }
 
 // @Summary		Delete a role
-// @Description	Cascades: rows in roles_permissions and users_roles go with it, so everyone holding this role loses what it granted. SUPER_ADMIN cannot be deleted.
+// @Description	Soft delete: the role is hidden and everyone holding it loses what it granted at once. Its grants and holders are kept until DELETE /roles/{id}/permanent. SUPER_ADMIN cannot be deleted.
 // @Tags			roles
 // @Produce		json
 // @Param			id	path	string	true	"role id (uuid)"
@@ -150,6 +152,31 @@ func (h *Handler) DeleteRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.DeleteRole(r.Context(), id); err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	h.ReturnWithJSON(w, http.StatusNoContent, nil)
+}
+
+// @Summary		Permanently delete a role
+// @Description	Only a role already deleted with DELETE /roles/{id}. Cascades: its rows in roles_permissions and users_roles are removed. Cannot be undone.
+// @Tags			roles
+// @Produce		json
+// @Param			id	path	string	true	"role id (uuid)"
+// @Success		204	"permanently deleted"
+// @Failure		404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
+// @Failure		409	{object}	handler.ErrorResponse	"40901 CONFLICT (not deleted yet)"
+// @Security		CSRFToken
+// @Router			/roles/{id}/permanent [delete]
+func (h *Handler) PermanentDeleteRole(w http.ResponseWriter, r *http.Request) {
+	id, err := handler.ParsePathUUID(r, "id")
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	if err := h.service.PermanentDeleteRole(r.Context(), id); err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}

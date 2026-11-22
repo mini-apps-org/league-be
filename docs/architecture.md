@@ -101,7 +101,7 @@ RequireSession                 sid cookie → authHandler.AuthenticateSession �
   SERVICE        repo.UpdateSessionLastSeenAt(…)
 RequireSession                 ok → user id into ctx;  err → clear cookie, 401 40102
 HANDLER          ExtractUserIDFromContext(ctx) → service.GetUser(ctx, id) → repo.GetUserByID(…)
-                 → ReturnWithJSON(200, SuccessResponse{Data: CurrentUserResponse{…}})
+                 → ReturnWithJSON(200, SuccessResponse[CurrentUserResponse]{Data: CurrentUserResponse{…}})
 ```
 
 Note that `GetSession` takes two `time.Time` cutoffs, not TTLs: deciding they are

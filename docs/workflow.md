@@ -60,7 +60,12 @@ Retired codes (`40002`, `40303`) stay retired and are marked as such in the file
 
 ## 3. HTTP
 
-- Success body is always `config.SuccessResponse{Data: ...}` via `h.ReturnWithJSON`.
+- Success body is always `handler.SuccessResponse[T]{Data: ...}` via `h.ReturnWithJSON`
+  (`internal/platform/handler/response.go`, beside `ErrorResponse`). A single item is
+  `{"data": {…}}`. A list adds `metadata`, built with `handler.NewMetadata(len(items))`
+  or, when paged, `handler.NewPageMetadata(len(items), page.Total, page.NextCursor)`:
+  `{"data": […], "metadata": {"count": 10, "total": 87, "has_more": true, "next_cursor": "…"}}`
+  — `total` on the first page only, `next_cursor` only while `has_more`.
 - Request bodies go through `h.DecodeJSON` — it caps the body and rejects unknown fields.
 - List endpoints page by keyset. Call `model.CursorParams.Normalise()` in the service
   so an unbounded scan cannot be requested.
@@ -98,7 +103,9 @@ environment variables. So:
   `IF NOT EXISTS`. Ids are `TEXT` holding `uuid_generate_v4()`, so every FK into them is
   `TEXT` too.
 - Dev data: `db/migrations/seeds/YYYYMMDD_seed.sql`, keyed on natural keys only, so it
-  re-reads top to bottom without depending on generated uuids.
+  re-reads top to bottom without depending on generated uuids. A new checkout applies the
+  **latest** seed only, after the schema; it truncates its league data first, so it can be
+  re-applied to reset dev data. Rules: `.claude/rules/migrations.md` §6.
 - No migration runner is wired into the Makefile — apply with `psql "$DATABASE_URL" -f <file>`
   and say so in the PR description, including the order.
 
