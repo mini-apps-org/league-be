@@ -114,3 +114,17 @@ type TransferRosterPlayerServiceParams struct {
 	ToDivisionID string
 	ToTeamID     string
 }
+
+// BulkDeleteTeamsResult is the outcome of a best-effort bulk delete: every requested team
+// is in exactly one of DeletedIDs and Failures.
+type BulkDeleteTeamsResult struct {
+	DeletedIDs []string
+	Failures   []BulkDeleteTeamFailure
+}
+
+// BulkDeleteTeamFailure is one team a bulk delete could not delete. Err is what the single
+// delete would have returned for it.
+type BulkDeleteTeamFailure struct {
+	TeamID string
+	Err    error
+}

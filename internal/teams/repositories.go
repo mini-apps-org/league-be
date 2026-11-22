@@ -35,6 +35,8 @@ type Repository interface {
 	UpdateTeam(ctx context.Context, id string, params UpdateTeamServiceParams) (*Team, error)
 	SoftDeleteTeam(ctx context.Context, id string) error
 	PermanentDeleteTeam(ctx context.Context, id string) error
+	BulkSoftDeleteTeams(ctx context.Context, ids []string) (*BulkDeleteTeamsResult, error)
+	BulkPermanentDeleteTeams(ctx context.Context, ids []string) (*BulkDeleteTeamsResult, error)
 
 	AddDivisionTeam(ctx context.Context, divisionID, teamID string) (*DivisionTeam, error)
 	GetDivisionTeam(ctx context.Context, divisionID, teamID string) (*DivisionTeam, error)

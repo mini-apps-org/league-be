@@ -184,6 +184,142 @@ func (r *repository) missingOrLiveTeamError(ctx context.Context, id string) erro
 	return ErrTeamNotFound
 }
 
+// BulkSoftDeleteTeams soft-deletes every live team in ids and closes their active roster
+// entries, in one statement. A requested team it did not delete was missing or already
+// deleted: ErrTeamNotFound, as SoftDeleteTeam reports. ids must be canonical uuids.
+func (r *repository) BulkSoftDeleteTeams(ctx context.Context, ids []string) (*BulkDeleteTeamsResult, error) {
+	// A data-modifying WITH runs whether or not the outer query reads it, so the rosters
+	// close in the same statement, and so the same transaction, as the teams.
+	const query = `
+WITH deleted AS (
+    UPDATE teams SET
+        is_deleted = true,
+        updated_at = now()
+    WHERE id = ANY($1::uuid[]) AND NOT is_deleted
+    RETURNING id
+), closed_rosters AS (
+    UPDATE team_rosters SET
+        left_at    = now(),
+        updated_at = now()
+    WHERE team_id IN (SELECT id FROM deleted) AND left_at IS NULL
+)
+SELECT id FROM deleted`
+	args := []any{
+		ids, // $1 team ids
+	}
+
+	rows, err := r.pgPool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("teams: bulk soft delete teams: %w", err)
+	}
+	deletedIDs, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, fmt.Errorf("teams: bulk soft delete teams: %w", err)
+	}
+
+	return newBulkDeleteTeamsResult(ids, deletedIDs, func(string) error { return ErrTeamNotFound }), nil
+}
+
+// teamDeleteState is what a bulk permanent delete reads to explain a team it left in place.
+type teamDeleteState struct {
+	ID         string `db:"id"`
+	TeamExists bool   `db:"team_exists"`
+	IsDeleted  bool   `db:"is_deleted"`
+}
+
+// BulkPermanentDeleteTeams removes every soft-deleted team in ids that has no fixture, then
+// reads why each other one stayed: missing (ErrTeamNotFound), not soft-deleted
+// (ErrTeamNotSoftDeleted) or with a fixture (ErrTeamHasMatches) — what PermanentDeleteTeam
+// reports. Two statements in one transaction. ids must be canonical uuids.
+func (r *repository) BulkPermanentDeleteTeams(ctx context.Context, ids []string) (*BulkDeleteTeamsResult, error) {
+	// A team with a fixture is skipped here rather than left to the team_matches foreign
+	// keys: a violation aborts the whole statement, and with it every other team.
+	const deleteQuery = `
+DELETE FROM teams t
+WHERE t.id = ANY($1::uuid[])
+  AND t.is_deleted
+  AND NOT EXISTS (
+      SELECT 1 FROM team_matches m
+      WHERE m.home_team_id = t.id OR m.away_team_id = t.id
+  )
+RETURNING t.id`
+	const stateQuery = `
+SELECT
+    requested.id                    AS id,
+    t.id IS NOT NULL                AS team_exists,
+    COALESCE(t.is_deleted, false)   AS is_deleted
+FROM unnest($1::uuid[]) AS requested (id)
+LEFT JOIN teams t ON t.id = requested.id`
+	args := []any{
+		ids, // $1 team ids
+	}
+
+	var (
+		deletedIDs []string
+		states     = map[string]teamDeleteState{}
+	)
+	err := pgx.BeginFunc(ctx, r.pgPool, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, deleteQuery, args...)
+		if err != nil {
+			return err
+		}
+		if deletedIDs, err = pgx.CollectRows(rows, pgx.RowTo[string]); err != nil {
+			return err
+		}
+
+		rows, err = tx.Query(ctx, stateQuery, args...)
+		if err != nil {
+			return err
+		}
+		found, err := pgx.CollectRows(rows, pgx.RowToStructByName[teamDeleteState])
+		if err != nil {
+			return err
+		}
+		for _, state := range found {
+			states[state.ID] = state
+		}
+		return nil
+	})
+	// Only a fixture written between the NOT EXISTS and the DELETE reaches the foreign keys:
+	// the whole batch then fails as ErrTeamHasMatches.
+	if sentinel := constraintError(err); sentinel != nil {
+		return nil, sentinel
+	}
+	if err != nil {
+		return nil, fmt.Errorf("teams: bulk permanently delete teams: %w", err)
+	}
+
+	return newBulkDeleteTeamsResult(ids, deletedIDs, func(id string) error {
+		switch state := states[id]; {
+		case !state.TeamExists:
+			return ErrTeamNotFound
+		case !state.IsDeleted:
+			return ErrTeamNotSoftDeleted
+		default:
+			return ErrTeamHasMatches
+		}
+	}), nil
+}
+
+// newBulkDeleteTeamsResult lists each requested id exactly once, in request order: in
+// DeletedIDs when the statement returned it, otherwise in Failures with failureOf(id).
+func newBulkDeleteTeamsResult(requestedIDs, deletedIDs []string, failureOf func(id string) error) *BulkDeleteTeamsResult {
+	deleted := make(map[string]bool, len(deletedIDs))
+	for _, id := range deletedIDs {
+		deleted[id] = true
+	}
+
+	result := &BulkDeleteTeamsResult{DeletedIDs: []string{}, Failures: []BulkDeleteTeamFailure{}}
+	for _, id := range requestedIDs {
+		if deleted[id] {
+			result.DeletedIDs = append(result.DeletedIDs, id)
+			continue
+		}
+		result.Failures = append(result.Failures, BulkDeleteTeamFailure{TeamID: id, Err: failureOf(id)})
+	}
+	return result
+}
+
 func (r *repository) AddDivisionTeam(ctx context.Context, divisionID, teamID string) (*DivisionTeam, error) {
 	// No row back means the team is missing or soft-deleted.
 	const query = `

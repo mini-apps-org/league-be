@@ -21,6 +21,7 @@ import (
 const (
 	maxTeamNameLength    = 100
 	maxSearchQueryLength = 100
+	maxBulkTeamIDs       = 100
 )
 
 var (
@@ -45,6 +46,8 @@ type Service interface {
 	UpdateTeam(ctx context.Context, id string, params UpdateTeamServiceParams) (*Team, error)
 	DeleteTeamByID(ctx context.Context, id string) error
 	PermanentDeleteTeam(ctx context.Context, id string) error
+	BulkSoftDeleteTeams(ctx context.Context, ids []string) (*BulkDeleteTeamsResult, error)
+	BulkPermanentDeleteTeams(ctx context.Context, ids []string) (*BulkDeleteTeamsResult, error)
 
 	AddDivisionTeam(ctx context.Context, divisionID, teamID string) (*DivisionTeam, error)
 	RemoveDivisionTeam(ctx context.Context, divisionID, teamID string) error
@@ -171,6 +174,76 @@ func (s *service) DeleteTeamByID(ctx context.Context, id string) error {
 
 func (s *service) PermanentDeleteTeam(ctx context.Context, id string) error {
 	return asAPIError(s.repo.PermanentDeleteTeam(ctx, id))
+}
+
+// BulkSoftDeleteTeams soft-deletes the teams in one statement, best effort: a team that
+// cannot be deleted is reported with the error DeleteTeamByID would return, and the rest
+// still are.
+func (s *service) BulkSoftDeleteTeams(ctx context.Context, ids []string) (*BulkDeleteTeamsResult, error) {
+	ids, err := normaliseBulkTeamIDs(ids)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.repo.BulkSoftDeleteTeams(ctx, ids)
+	if err != nil {
+		return nil, asAPIError(err)
+	}
+	return withAPIErrors(result), nil
+}
+
+// BulkPermanentDeleteTeams permanently deletes the soft-deleted teams without fixtures,
+// best effort, each failure being the error PermanentDeleteTeam would return.
+func (s *service) BulkPermanentDeleteTeams(ctx context.Context, ids []string) (*BulkDeleteTeamsResult, error) {
+	ids, err := normaliseBulkTeamIDs(ids)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.repo.BulkPermanentDeleteTeams(ctx, ids)
+	if err != nil {
+		return nil, asAPIError(err)
+	}
+	return withAPIErrors(result), nil
+}
+
+// withAPIErrors turns each failure's repository sentinel into the API error the single
+// delete serves for it.
+func withAPIErrors(result *BulkDeleteTeamsResult) *BulkDeleteTeamsResult {
+	for i := range result.Failures {
+		result.Failures[i].Err = asAPIError(result.Failures[i].Err)
+	}
+	return result
+}
+
+// TODO vincent: Will move into the reuse function later
+// normaliseBulkTeamIDs rejects a malformed request as a whole — that is a client bug, not
+// one team's outcome — puts each id in canonical form, and drops repeated ids, keeping
+// their first position.
+func normaliseBulkTeamIDs(ids []string) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, newValidationError("ids must hold at least one team id")
+	}
+
+	unique := make([]string, 0, len(ids))
+	seen := make(map[string]bool, len(ids))
+	for i, raw := range ids {
+		// Canonical, so a repeat in another case is dropped and each id matches the form the
+		// delete statements return.
+		id, err := common.NormaliseUUID(raw)
+		if err != nil {
+			return nil, newValidationError(fmt.Sprintf("ids[%d] must be a uuid", i))
+		}
+		if !seen[id] {
+			seen[id] = true
+			unique = append(unique, id)
+		}
+	}
+
+	if len(unique) > maxBulkTeamIDs {
+		return nil, newValidationError(fmt.Sprintf("ids must hold at most %d teams", maxBulkTeamIDs))
+	}
+	return unique, nil
 }
 
 func (s *service) AddDivisionTeam(ctx context.Context, divisionID, teamID string) (*DivisionTeam, error) {

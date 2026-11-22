@@ -3,6 +3,7 @@ package teams
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
@@ -44,16 +45,18 @@ func (fakePermissions) GetPermissionCodesByUserID(_ context.Context, userID stri
 // stopped the request before the database.
 type fakeRepository struct {
 	Repository
-	activePlayerIDs map[string]bool
-	created         *CreateTeamServiceParams
-	listedTeams     *ListTeamsServiceParams
-	teamRows        []Team
-	countCalls      int
-	listedRoster    *ListRosterPlayersServiceParams
-	added           bool
-	removed         bool
-	transferred     bool
-	updated         bool
+	activePlayerIDs  map[string]bool
+	created          *CreateTeamServiceParams
+	listedTeams      *ListTeamsServiceParams
+	teamRows         []Team
+	countCalls       int
+	softDeletes      fakeBulkDeletes
+	permanentDeletes fakeBulkDeletes
+	listedRoster     *ListRosterPlayersServiceParams
+	added            bool
+	removed          bool
+	transferred      bool
+	updated          bool
 }
 
 func newFakeRepository() *fakeRepository {
@@ -141,6 +144,37 @@ func (f *fakeRepository) GetDivisionTeam(_ context.Context, divisionID, teamID s
 func (f *fakeRepository) ListRosterPlayers(_ context.Context, params ListRosterPlayersServiceParams) ([]RosterPlayer, error) {
 	f.listedRoster = &params
 	return []RosterPlayer{}, nil
+}
+
+// fakeBulkDeletes answers BulkSoftDeleteTeams and BulkPermanentDeleteTeams: an id in
+// failures fails with that sentinel, any other is deleted; err fails the whole statement.
+// The ids of the last call are recorded.
+type fakeBulkDeletes struct {
+	failures map[string]error
+	err      error
+	called   []string
+}
+
+func (f *fakeBulkDeletes) delete(ids []string) (*BulkDeleteTeamsResult, error) {
+	f.called = ids
+	if f.err != nil {
+		return nil, f.err
+	}
+	var deletedIDs []string
+	for _, id := range ids {
+		if f.failures[id] == nil {
+			deletedIDs = append(deletedIDs, id)
+		}
+	}
+	return newBulkDeleteTeamsResult(ids, deletedIDs, func(id string) error { return f.failures[id] }), nil
+}
+
+func (f *fakeRepository) BulkSoftDeleteTeams(_ context.Context, ids []string) (*BulkDeleteTeamsResult, error) {
+	return f.softDeletes.delete(ids)
+}
+
+func (f *fakeRepository) BulkPermanentDeleteTeams(_ context.Context, ids []string) (*BulkDeleteTeamsResult, error) {
+	return f.permanentDeletes.delete(ids)
 }
 
 func errorCode(err error) handler.ErrorCode {
@@ -584,5 +618,139 @@ func TestCreateTeamRequiresDivision(t *testing.T) {
 				t.Errorf("division_id passed on = %q, want %q", repo.created.DivisionID, tt.divisionID)
 			}
 		})
+	}
+}
+
+// A malformed bulk request is the client's bug, not one team's outcome: it is rejected as a
+// whole before any team is touched. Repeats count once against the limit, and ids reach the
+// repository canonical: the delete statements return canonical ids, so an upper-case id
+// would otherwise be deleted and still reported as not found.
+func TestBulkDeleteTeamsRequestIsValidated(t *testing.T) {
+	uniqueIDs := func(n int) []string {
+		ids := make([]string, n)
+		for i := range ids {
+			ids[i] = fmt.Sprintf("00000000-0000-4000-8000-%012d", i)
+		}
+		return ids
+	}
+
+	tests := []struct {
+		name        string
+		ids         []string
+		wantCode    handler.ErrorCode
+		wantReached int
+	}{
+		{"no ids", nil, handler.CodeValidationFailed, 0},
+		{"one not a uuid", []string{testTeamID, "abc"}, handler.CodeValidationFailed, 0},
+		{"over the limit", uniqueIDs(maxBulkTeamIDs + 1), handler.CodeValidationFailed, 0},
+		{"at the limit", uniqueIDs(maxBulkTeamIDs), "", maxBulkTeamIDs},
+		{"repeats count once", append(uniqueIDs(maxBulkTeamIDs), uniqueIDs(maxBulkTeamIDs)...), "", maxBulkTeamIDs},
+		{"a repeat in upper case counts once", []string{testTeamID, strings.ToUpper(testTeamID)}, "", 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newFakeRepository()
+			_, err := NewService(repo, fakePermissions{}, testLogger).BulkSoftDeleteTeams(context.Background(), tt.ids)
+
+			if got := errorCode(err); got != tt.wantCode {
+				t.Fatalf("error code = %q, want %q (err: %v)", got, tt.wantCode, err)
+			}
+			if len(repo.softDeletes.called) != tt.wantReached {
+				t.Errorf("teams reaching the repository = %d, want %d", len(repo.softDeletes.called), tt.wantReached)
+			}
+		})
+	}
+
+	t.Run("ids reach the repository canonical", func(t *testing.T) {
+		repo := newFakeRepository()
+		_, err := NewService(repo, fakePermissions{}, testLogger).
+			BulkSoftDeleteTeams(context.Background(), []string{strings.ToUpper(testTeamID), "{" + testOtherTeam + "}"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := strings.Join(repo.softDeletes.called, ","), testTeamID+","+testOtherTeam; got != want {
+			t.Errorf("ids passed = %s, want %s", got, want)
+		}
+	})
+}
+
+// Best effort: a team that cannot be deleted is reported with the code the single delete
+// returns, and the others are still deleted. A failure of the statement itself fails the
+// whole request, as a 500 without its cause.
+func TestBulkDeleteTeamsIsBestEffort(t *testing.T) {
+	const missingID = "55555555-5555-4555-8555-555555555555"
+	const liveID = "66666666-6666-4666-8666-666666666666"
+
+	t.Run("soft delete", func(t *testing.T) {
+		repo := newFakeRepository()
+		repo.softDeletes.failures = map[string]error{missingID: ErrTeamNotFound}
+
+		result, err := NewService(repo, fakePermissions{}, testLogger).
+			BulkSoftDeleteTeams(context.Background(), []string{testTeamID, missingID, testOtherTeam})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := strings.Join(result.DeletedIDs, ","), testTeamID+","+testOtherTeam; got != want {
+			t.Errorf("deleted = %s, want %s", got, want)
+		}
+		want := []BulkDeleteTeamFailureResponse{{ID: missingID, Code: handler.CodeNotFound, Message: "team not found"}}
+		if got := newBulkDeleteTeamsResponse(*result).Failed; fmt.Sprint(got) != fmt.Sprint(want) {
+			t.Errorf("failed = %+v\nwant     %+v", got, want)
+		}
+	})
+
+	t.Run("permanent delete", func(t *testing.T) {
+		repo := newFakeRepository()
+		repo.permanentDeletes.failures = map[string]error{
+			missingID:  ErrTeamNotFound,
+			liveID:     ErrTeamNotSoftDeleted,
+			testTeamID: ErrTeamHasMatches,
+		}
+
+		result, err := NewService(repo, fakePermissions{}, testLogger).
+			BulkPermanentDeleteTeams(context.Background(), []string{testTeamID, missingID, liveID, testOtherTeam})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Join(result.DeletedIDs, ","); got != testOtherTeam {
+			t.Errorf("deleted = %s, want %s", got, testOtherTeam)
+		}
+		want := []BulkDeleteTeamFailureResponse{
+			{ID: testTeamID, Code: handler.CodeConflict, Message: "the team has scheduled or played matches"},
+			{ID: missingID, Code: handler.CodeNotFound, Message: "team not found"},
+			{ID: liveID, Code: handler.CodeConflict, Message: "delete the team before deleting it permanently"},
+		}
+		if got := newBulkDeleteTeamsResponse(*result).Failed; fmt.Sprint(got) != fmt.Sprint(want) {
+			t.Errorf("failed = %+v\nwant     %+v", got, want)
+		}
+	})
+
+	t.Run("statement failure fails the request", func(t *testing.T) {
+		repo := newFakeRepository()
+		repo.softDeletes.err = errors.New("teams: bulk soft delete teams: connection reset by peer")
+
+		_, err := NewService(repo, fakePermissions{}, testLogger).
+			BulkSoftDeleteTeams(context.Background(), []string{testTeamID})
+		if got := handler.AsAPIError(err); got.Code != handler.CodeInternal || strings.Contains(got.Message, "connection reset") {
+			t.Errorf("error = %s %q, want %s without its cause", got.Code, got.Message, handler.CodeInternal)
+		}
+	})
+}
+
+// Every requested id must appear exactly once, in request order, whether the statement
+// returned it or not — the client matches results back to its selection by position too.
+func TestNewBulkDeleteTeamsResult(t *testing.T) {
+	result := newBulkDeleteTeamsResult([]string{"a", "b", "c", "d"}, []string{"d", "b"}, func(string) error { return ErrTeamNotFound })
+
+	if got := strings.Join(result.DeletedIDs, ","); got != "b,d" {
+		t.Errorf("deleted = %s, want b,d", got)
+	}
+	var failed []string
+	for _, failure := range result.Failures {
+		failed = append(failed, failure.TeamID)
+	}
+	if got := strings.Join(failed, ","); got != "a,c" {
+		t.Errorf("failed = %s, want a,c", got)
 	}
 }

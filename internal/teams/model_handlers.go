@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/nguyentanvinh/league-be/internal/common"
+	"github.com/nguyentanvinh/league-be/internal/platform/handler"
 )
 
 type CreateTeamRequest struct {
@@ -69,6 +70,38 @@ type RosterPlayerResponse struct {
 
 // The newXResponse mappers copy fields by name; TestResponsesCopyEveryField fails if a
 // rename leaves a response field unfilled.
+
+type BulkDeleteTeamsRequest struct {
+	IDs []string `json:"ids" example:"5e8a2c1d-3b7f-4a90-8c6e-2d1f0b9a7e44"`
+}
+
+// BulkDeleteTeamsResponse lists every requested team once: deleted, or failed with the
+// error the single delete would have returned.
+type BulkDeleteTeamsResponse struct {
+	DeletedIDs []string                        `json:"deleted_ids"`
+	Failed     []BulkDeleteTeamFailureResponse `json:"failed"`
+}
+
+type BulkDeleteTeamFailureResponse struct {
+	ID      string            `json:"id"`
+	Code    handler.ErrorCode `json:"code" example:"40401"`
+	Message string            `json:"message" example:"team not found"`
+}
+
+// newBulkDeleteTeamsResponse serves each failure as its public code and message;
+// handler.AsAPIError turns an unclassified error into 50001 without its cause.
+func newBulkDeleteTeamsResponse(result BulkDeleteTeamsResult) BulkDeleteTeamsResponse {
+	failed := make([]BulkDeleteTeamFailureResponse, 0, len(result.Failures))
+	for _, failure := range result.Failures {
+		apiErr := handler.AsAPIError(failure.Err)
+		failed = append(failed, BulkDeleteTeamFailureResponse{
+			ID:      failure.TeamID,
+			Code:    apiErr.Code,
+			Message: apiErr.Message,
+		})
+	}
+	return BulkDeleteTeamsResponse{DeletedIDs: result.DeletedIDs, Failed: failed}
+}
 
 func newTeamResponse(team Team) TeamResponse {
 	return common.CopyFieldsByName[TeamResponse](&team)

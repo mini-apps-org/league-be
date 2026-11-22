@@ -21,6 +21,8 @@ func (r *Router) registerTeamRoute(api *mux.Router, mw middleware.Middleware, pe
 
 	api.Handle("/teams", guard(config.PermissionFeatureTeams, teamHandler.ListTeams)).Methods(http.MethodGet)
 	api.Handle("/teams", guard(config.PermissionFeatureTeams, teamHandler.CreateTeam)).Methods(http.MethodPost)
+	api.Handle("/teams", guard(config.PermissionFeatureTeams, teamHandler.BulkSoftDeleteTeams)).Methods(http.MethodDelete)
+	api.Handle("/teams/permanent", guard(config.PermissionFeatureTeams, teamHandler.BulkPermanentDeleteTeams)).Methods(http.MethodDelete)
 	api.Handle("/teams/{id}", guard(config.PermissionFeatureTeams, teamHandler.GetTeamByID)).Methods(http.MethodGet)
 	api.Handle("/teams/{id}", guard(config.PermissionFeatureTeams, teamHandler.UpdateTeam)).Methods(http.MethodPatch)
 	api.Handle("/teams/{id}", guard(config.PermissionFeatureTeams, teamHandler.DeleteTeamByID)).Methods(http.MethodDelete)

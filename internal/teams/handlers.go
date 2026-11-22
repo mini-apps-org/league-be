@@ -191,6 +191,60 @@ func (h *Handler) DeleteTeamByID(w http.ResponseWriter, r *http.Request) {
 	h.ReturnWithJSON(w, http.StatusNoContent, nil)
 }
 
+// @Summary		Soft-delete several teams
+// @Description	Best effort, in one statement: every live team in `ids` is soft-deleted and its active roster closed, as DELETE /teams/{id} does. A team that cannot be deleted is listed in `failed` with the code and message the single delete returns (40401 missing or already deleted); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.
+// @Tags			teams
+// @Accept			json
+// @Produce		json
+// @Param			body	body		teams.BulkDeleteTeamsRequest	true	"teams to soft-delete"
+// @Success		200		{object}	handler.SuccessResponse[teams.BulkDeleteTeamsResponse]
+// @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)"
+// @Failure		403		{object}	handler.ErrorResponse	"40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED"
+// @Security		CSRFToken
+// @Router			/teams [delete]
+func (h *Handler) BulkSoftDeleteTeams(w http.ResponseWriter, r *http.Request) {
+	var body BulkDeleteTeamsRequest
+	if err := h.DecodeJSON(w, r, &body); err != nil {
+		h.ReturnWithError(w, r, handler.InvalidJSONBodyError(err))
+		return
+	}
+
+	result, err := h.service.BulkSoftDeleteTeams(r.Context(), body.IDs)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[BulkDeleteTeamsResponse]{Data: newBulkDeleteTeamsResponse(*result)})
+}
+
+// @Summary		Permanently delete several teams
+// @Description	Best effort, in one transaction: every team in `ids` that is soft-deleted and has no fixture is removed, as DELETE /teams/{id}/permanent does. A team that cannot be deleted is listed in `failed` (40401 missing, 40901 not deleted yet or has fixtures); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.
+// @Tags			teams
+// @Accept			json
+// @Produce		json
+// @Param			body	body		teams.BulkDeleteTeamsRequest	true	"soft-deleted teams to remove"
+// @Success		200		{object}	handler.SuccessResponse[teams.BulkDeleteTeamsResponse]
+// @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)"
+// @Failure		403		{object}	handler.ErrorResponse	"40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED"
+// @Security		CSRFToken
+// @Router			/teams/permanent [delete]
+func (h *Handler) BulkPermanentDeleteTeams(w http.ResponseWriter, r *http.Request) {
+	var body BulkDeleteTeamsRequest
+	if err := h.DecodeJSON(w, r, &body); err != nil {
+		h.ReturnWithError(w, r, handler.InvalidJSONBodyError(err))
+		return
+	}
+
+	result, err := h.service.BulkPermanentDeleteTeams(r.Context(), body.IDs)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[BulkDeleteTeamsResponse]{Data: newBulkDeleteTeamsResponse(*result)})
+}
+
 // @Summary		Permanently delete a team
 // @Description	Only a team already deleted with DELETE /teams/{id}. Cascades to its division entries and roster history; a team with scheduled or played matches cannot be removed. Cannot be undone.
 // @Tags			teams
