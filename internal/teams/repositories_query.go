@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -322,14 +321,4 @@ func rosterSortColumn(field string) (column, columnType string) {
 // does not match everything.
 func escapeLike(value string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(value)
-}
-
-// logQuery records a query built at runtime, at debug level: on in development, off in
-// staging and production. It logs how many args there are but never their values, which
-// carry names and search terms.
-func (r *repository) logQuery(ctx context.Context, operation, query string, args []any) {
-	r.logger.DebugContext(ctx, "teams: "+operation,
-		slog.String("sql", query),
-		slog.Int("args", len(args)),
-	)
 }
