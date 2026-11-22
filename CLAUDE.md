@@ -24,6 +24,11 @@ When naming any function, method, type, constant or variable, follow
 
 When changing the database schema — `db/migrations/000001-init.sql` or a file under
 `db/migrations/<year>/` — follow @.claude/rules/migrations.md
+When adding or granting a permission in a migration or seed, follow
+@.claude/rules/permissions.md
+
+When adding a DELETE endpoint, or any query that reads a table with `is_deleted`, follow
+@.claude/rules/soft-delete.md
 
 ## CodeGraph — preferred search tool
 
