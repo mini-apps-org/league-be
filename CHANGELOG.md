@@ -1,8 +1,8 @@
 # Changelog
 
-## [TBD](https://github.com/mini-apps-org/league-be/releases/tag/TBD) - 2026-11-XX
+## [0.8.0](https://github.com/mini-apps-org/league-be/releases/tag/0.8.0) - 2026-11-XX
 
-- [#TBD](https://github.com/mini-apps-org/league-be/pull/TBD)
+- [#PR7](https://github.com/mini-apps-org/league-be/pull/PR7)
   - feat(team): add the teams API — create a team in its home division, update it, and enter it into more divisions
   - feat(roster): add per-division rosters at `/teams-roster/{id}` — add, transfer and remove players; a captain changes only their own team
   - feat(team): filter, sort and cursor-page the team and roster lists with `q`, `sort`, `limit` and `cursor`
