@@ -123,15 +123,6 @@ CREATE TABLE IF NOT EXISTS players (
 CREATE UNIQUE INDEX IF NOT EXISTS players_member_id_key
 	ON players (member_id) WHERE member_id <> '';
 
-CREATE TABLE IF NOT EXISTS division_teams (
-	division_id  UUID        NOT NULL REFERENCES divisions (id) ON DELETE CASCADE,
-	team_id      UUID        NOT NULL REFERENCES teams (id) ON DELETE CASCADE,
-	created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-	PRIMARY KEY (division_id, team_id)
-);
-
-
 CREATE TABLE IF NOT EXISTS teams (
 	id                 UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
 	division_id        UUID        NOT NULL REFERENCES divisions (id) ON DELETE CASCADE,
@@ -148,27 +139,44 @@ CREATE TABLE IF NOT EXISTS teams (
 	CONSTRAINT teams_division_id_team_code_key UNIQUE (division_id, team_code)
 );
 
--- Historical roster membership. Transfers close the old row and create a new
--- one, preserving match history. Eligibility rules are enforced by the service layer.
-CREATE TABLE IF NOT EXISTS team_rosters (
-	id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-	team_id     UUID        NOT NULL REFERENCES teams (id) ON DELETE CASCADE,
-	player_id   UUID        NOT NULL REFERENCES players (id) ON DELETE CASCADE,
-	joined_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-	left_at     TIMESTAMPTZ,  -- NULL means currently active
-	created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-	updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+-- One row per season a team plays. Rosters and fixtures reference this, not teams, so a
+-- team has neither in a division it never entered.
+CREATE TABLE IF NOT EXISTS division_teams (
+	division_id  UUID        NOT NULL REFERENCES divisions (id) ON DELETE CASCADE,
+	team_id      UUID        NOT NULL REFERENCES teams (id) ON DELETE CASCADE,
+	created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+	PRIMARY KEY (division_id, team_id)
+);
+
+-- Supports a team's season history.
+CREATE INDEX IF NOT EXISTS division_teams_team_id_idx ON division_teams (team_id);
+
+-- Historical roster membership of a team within a division. Transfers close the old row
+-- and create a new one, preserving match history.
+CREATE TABLE IF NOT EXISTS team_rosters (
+	id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+	division_id  UUID        NOT NULL,
+	team_id      UUID        NOT NULL,
+	player_id    UUID        NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+	joined_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+	left_at      TIMESTAMPTZ,  -- NULL means currently active
+	created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+	CONSTRAINT team_rosters_division_team_fkey
+		FOREIGN KEY (division_id, team_id) REFERENCES division_teams (division_id, team_id) ON DELETE CASCADE,
 	UNIQUE (team_id, player_id, joined_at),
 	CHECK (left_at IS NULL OR left_at > joined_at)
 );
 
--- Supports lookups of a team's current players and a player's current team.
-CREATE INDEX IF NOT EXISTS team_rosters_team_id_active_idx
-	ON team_rosters (team_id) WHERE left_at IS NULL;
+-- One active team per player per division, enforced here rather than by a check-then-insert.
+CREATE UNIQUE INDEX IF NOT EXISTS team_rosters_player_id_division_id_active_key
+	ON team_rosters (player_id, division_id) WHERE left_at IS NULL;
 
-CREATE INDEX IF NOT EXISTS team_rosters_player_id_active_idx
-	ON team_rosters (player_id) WHERE left_at IS NULL;
+-- Supports lookups of a team's current players in a division.
+CREATE INDEX IF NOT EXISTS team_rosters_division_id_team_id_active_idx
+	ON team_rosters (division_id, team_id) WHERE left_at IS NULL;
 
 -- Audit trail for skill-level changes.
 CREATE TABLE IF NOT EXISTS skill_level_history (
@@ -228,6 +236,12 @@ CREATE TABLE IF NOT EXISTS team_matches (
 	created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+	-- Both teams must have entered the division. No ON DELETE: a team with a fixture can
+	-- be neither withdrawn from the division nor permanently deleted.
+	CONSTRAINT team_matches_home_division_team_fkey
+		FOREIGN KEY (division_id, home_team_id) REFERENCES division_teams (division_id, team_id),
+	CONSTRAINT team_matches_away_division_team_fkey
+		FOREIGN KEY (division_id, away_team_id) REFERENCES division_teams (division_id, team_id),
 	CHECK (home_team_id <> away_team_id)
 );
 

@@ -1,6 +1,6 @@
 -- Development seed. Applied by `make seed`, not part of the schema.
 --
--- Natural keys (league name, session name, team number, member id) are used for every lookup
+-- Natural keys (league name, session name, team code, member id) are used for every lookup
 -- so the file never depends on generated uuids and can be re-read top to bottom.
 
 BEGIN;

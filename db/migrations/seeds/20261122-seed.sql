@@ -53,16 +53,19 @@ INSERT INTO venues (league_id, name, address)
 SELECT l.id, 'Saigon Cue Club', '12 Nguyen Hue, District 1, Ho Chi Minh City'
 FROM leagues l WHERE l.name = 'MVIP League';
 
-INSERT INTO teams (venue_id, team_code, name)
-SELECT v.id, t.team_code, t.name
-FROM venues v
+-- Each team is created in its home division (teams.division_id) and entered into it
+-- (division_teams), as POST /teams does.
+INSERT INTO teams (division_id, venue_id, team_code, name)
+SELECT d.id, v.id, t.team_code, t.name
+FROM divisions d
+CROSS JOIN venues v
 CROSS JOIN (VALUES
 	('03209', 'Corner Pocket Crew'),
 	('03214', 'Eight Ball Bandits'),
 	('03211', 'Rack Attack'),
 	('03207', 'Side Pocket Social')
 ) AS t (team_code, name)
-WHERE v.name = 'Saigon Cue Club';
+WHERE d.name = '8-Ball Open' AND v.name = 'Saigon Cue Club';
 
 INSERT INTO division_teams (division_id, team_id)
 SELECT d.id, t.id
