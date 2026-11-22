@@ -64,6 +64,7 @@ func (r *repository) GetPermissionCodesByUserID(ctx context.Context, userID stri
 	const query = `
 SELECT DISTINCT p.code
 FROM users_roles ur
+JOIN roles ro             ON ro.id = ur.role_id AND NOT ro.is_deleted
 JOIN roles_permissions rp ON rp.role_id = ur.role_id
 JOIN permissions p        ON p.id = rp.permission_id
 WHERE ur.user_id = $1

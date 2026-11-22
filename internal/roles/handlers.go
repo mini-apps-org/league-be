@@ -133,7 +133,7 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 }
 
 // @Summary		Delete a role
-// @Description	Cascades: rows in roles_permissions and users_roles go with it, so everyone holding this role loses what it granted. SUPER_ADMIN cannot be deleted.
+// @Description	Soft delete: the role is hidden and everyone holding it loses what it granted at once. Its grants and holders are kept until DELETE /roles/{id}/permanent. SUPER_ADMIN cannot be deleted.
 // @Tags			roles
 // @Produce		json
 // @Param			id	path	string	true	"role id (uuid)"
@@ -150,6 +150,31 @@ func (h *Handler) DeleteRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.DeleteRole(r.Context(), id); err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	h.ReturnWithJSON(w, http.StatusNoContent, nil)
+}
+
+// @Summary		Permanently delete a role
+// @Description	Only a role already deleted with DELETE /roles/{id}. Cascades: its rows in roles_permissions and users_roles are removed. Cannot be undone.
+// @Tags			roles
+// @Produce		json
+// @Param			id	path	string	true	"role id (uuid)"
+// @Success		204	"permanently deleted"
+// @Failure		404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
+// @Failure		409	{object}	handler.ErrorResponse	"40901 CONFLICT (not deleted yet)"
+// @Security		CSRFToken
+// @Router			/roles/{id}/permanent [delete]
+func (h *Handler) PermanentDeleteRole(w http.ResponseWriter, r *http.Request) {
+	id, err := handler.ParsePathUUID(r, "id")
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	if err := h.service.PermanentDeleteRole(r.Context(), id); err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}

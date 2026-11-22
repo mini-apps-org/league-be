@@ -314,7 +314,8 @@ CREATE TABLE IF NOT EXISTS roles (
 	code         VARCHAR(50) NOT NULL UNIQUE,
 	name         TEXT        NOT NULL,
 	description  TEXT,
-  is_deleted BOOLEAN NOT NULL DEFAULT false,
+	-- A soft-deleted role grants nothing: every permission lookup joins roles on NOT is_deleted.
+	is_deleted   BOOLEAN     NOT NULL DEFAULT false,
 	created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );

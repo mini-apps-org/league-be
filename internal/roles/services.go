@@ -25,6 +25,7 @@ type Service interface {
 	ListRoles(ctx context.Context) ([]Role, error)
 	UpdateRole(ctx context.Context, id string, params UpdateRoleServiceParams) (*Role, error)
 	DeleteRole(ctx context.Context, id string) error
+	PermanentDeleteRole(ctx context.Context, id string) error
 }
 
 type service struct {
@@ -84,7 +85,13 @@ func (s *service) DeleteRole(ctx context.Context, id string) error {
 		return superAdminProtectedError()
 	}
 
-	return asAPIError(s.repo.DeleteRole(ctx, id))
+	return asAPIError(s.repo.SoftDeleteRole(ctx, id))
+}
+
+// PermanentDeleteRole needs no SUPER_ADMIN check: DeleteRole refuses to soft-delete it, and
+// only a soft-deleted role can be removed.
+func (s *service) PermanentDeleteRole(ctx context.Context, id string) error {
+	return asAPIError(s.repo.PermanentDeleteRole(ctx, id))
 }
 
 // validateRoleFields checks the supplied (non-nil) fields. Lengths count runes, not
@@ -119,6 +126,8 @@ func asAPIError(err error) error {
 		return nil
 	case errors.Is(err, ErrRoleNotFound):
 		return handler.Error(handler.CodeNotFound, err)
+	case errors.Is(err, ErrRoleNotSoftDeleted):
+		return handler.ErrorWithMessage(handler.CodeConflict, "delete the role before deleting it permanently", err)
 	case errors.Is(err, ErrDuplicateRoleCode):
 		return handler.ErrorWithMessage(handler.CodeConflict, "a role with that code already exists", err)
 	default:

@@ -27,6 +27,7 @@ func (r *Router) registerRoleRoute(api *mux.Router, mw middleware.Middleware, pe
 	api.Handle("/roles/{id}", guard(config.PermissionFeatureRoles, roleHandler.GetRole)).Methods(http.MethodGet)
 	api.Handle("/roles/{id}", guard(config.PermissionFeatureRoles, roleHandler.UpdateRole)).Methods(http.MethodPatch)
 	api.Handle("/roles/{id}", guard(config.PermissionFeatureRoles, roleHandler.DeleteRole)).Methods(http.MethodDelete)
+	api.Handle("/roles/{id}/permanent", guard(config.PermissionFeatureRoles, roleHandler.PermanentDeleteRole)).Methods(http.MethodDelete)
 
 	// TODO vincent: Will be remove to another folder
 	api.Handle("/permissions", guard(config.PermissionFeaturePermissions, permissionHandler.ListPermissions)).Methods(http.MethodGet)

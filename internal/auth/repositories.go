@@ -57,7 +57,7 @@ WITH upserted AS (
     INSERT INTO users_roles (user_id, role_id)
     SELECT upserted.id, roles.id
     FROM upserted
-    JOIN roles ON roles.code = $7
+    JOIN roles ON roles.code = $7 AND NOT roles.is_deleted
     WHERE upserted.is_new_user
     ON CONFLICT (user_id, role_id) DO NOTHING
 )
@@ -98,10 +98,11 @@ func (r *repository) GetUserByID(ctx context.Context, id string) (*UserWithAcces
 SELECT ` + userColumns + `,
 	COALESCE((SELECT array_agg(ro.code ORDER BY ro.code)
 	          FROM users_roles ur
-	          JOIN roles ro ON ro.id = ur.role_id
+	          JOIN roles ro ON ro.id = ur.role_id AND NOT ro.is_deleted
 	          WHERE ur.user_id = users.id), '{}') AS roles,
 	COALESCE((SELECT array_agg(DISTINCT p.code ORDER BY p.code)
 	          FROM users_roles ur
+	          JOIN roles ro             ON ro.id = ur.role_id AND NOT ro.is_deleted
 	          JOIN roles_permissions rp ON rp.role_id = ur.role_id
 	          JOIN permissions p        ON p.id = rp.permission_id
 	          WHERE ur.user_id = users.id), '{}') AS permissions
