@@ -29,13 +29,6 @@ definitions:
       name:
         type: string
     type: object
-  github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata:
-    properties:
-      next_cursor:
-        type: string
-      total:
-        type: integer
-    type: object
   github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorBody:
     properties:
       code:
@@ -83,123 +76,132 @@ definitions:
       error:
         $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorBody'
     type: object
-  github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_permissions_PermissionResponse:
+  github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata:
     properties:
       count:
+        description: 'rows in this response: len(Data)'
         type: integer
+      has_more:
+        description: |-
+          Whether another page follows: NextCursor != nil. Always false on a list that is not
+          paged.
+        type: boolean
+      next_cursor:
+        description: Pass back as ?cursor= for the next page. Absent when HasMore
+          is false.
+        type: string
+      total:
+        description: |-
+          Rows matching the filters, across all pages. Sent on the first page only (no cursor):
+          one COUNT per list view rather than one per page.
+        type: integer
+    type: object
+  github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_permissions_PermissionResponse:
+    properties:
       data:
         items:
           $ref: '#/definitions/permissions.PermissionResponse'
         type: array
       metadata:
-        $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata'
-      session_id:
-        type: string
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
     type: object
   github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_roles_RoleResponse:
     properties:
-      count:
-        type: integer
       data:
         items:
           $ref: '#/definitions/roles.RoleResponse'
         type: array
       metadata:
-        $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata'
-      session_id:
-        type: string
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
     type: object
   github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_teams_RosterPlayerResponse:
     properties:
-      count:
-        type: integer
       data:
         items:
           $ref: '#/definitions/teams.RosterPlayerResponse'
         type: array
       metadata:
-        $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata'
-      session_id:
-        type: string
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
     type: object
   github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_teams_TeamResponse:
     properties:
-      count:
-        type: integer
       data:
         items:
           $ref: '#/definitions/teams.TeamResponse'
         type: array
       metadata:
-        $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata'
-      session_id:
-        type: string
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
     type: object
   github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-auth_CurrentUserResponse:
     properties:
-      count:
-        type: integer
       data:
         $ref: '#/definitions/auth.CurrentUserResponse'
       metadata:
-        $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata'
-      session_id:
-        type: string
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
     type: object
   github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-permissions_PermissionResponse:
     properties:
-      count:
-        type: integer
       data:
         $ref: '#/definitions/permissions.PermissionResponse'
       metadata:
-        $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata'
-      session_id:
-        type: string
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
     type: object
   github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-roles_RoleResponse:
     properties:
-      count:
-        type: integer
       data:
         $ref: '#/definitions/roles.RoleResponse'
       metadata:
-        $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata'
-      session_id:
-        type: string
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
+    type: object
+  github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_BulkDeleteTeamsResponse:
+    properties:
+      data:
+        $ref: '#/definitions/teams.BulkDeleteTeamsResponse'
+      metadata:
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
     type: object
   github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_DivisionTeamResponse:
     properties:
-      count:
-        type: integer
       data:
         $ref: '#/definitions/teams.DivisionTeamResponse'
       metadata:
-        $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata'
-      session_id:
-        type: string
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
     type: object
   github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_RosterPlayerResponse:
     properties:
-      count:
-        type: integer
       data:
         $ref: '#/definitions/teams.RosterPlayerResponse'
       metadata:
-        $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata'
-      session_id:
-        type: string
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
     type: object
   github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_TeamResponse:
     properties:
-      count:
-        type: integer
       data:
         $ref: '#/definitions/teams.TeamResponse'
       metadata:
-        $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata'
-      session_id:
-        type: string
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
     type: object
   permissions.PermissionResponse:
     properties:
@@ -285,6 +287,38 @@ definitions:
       player_id:
         example: 2d9c4b1e-8f3a-4c57-b6d2-0e7a1f5c9b30
         type: string
+    type: object
+  teams.BulkDeleteTeamFailureResponse:
+    properties:
+      code:
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorCode'
+        example: "40401"
+      id:
+        type: string
+      message:
+        example: team not found
+        type: string
+    type: object
+  teams.BulkDeleteTeamsRequest:
+    properties:
+      ids:
+        example:
+        - 5e8a2c1d-3b7f-4a90-8c6e-2d1f0b9a7e44
+        items:
+          type: string
+        type: array
+    type: object
+  teams.BulkDeleteTeamsResponse:
+    properties:
+      deleted_ids:
+        items:
+          type: string
+        type: array
+      failed:
+        items:
+          $ref: '#/definitions/teams.BulkDeleteTeamFailureResponse'
+        type: array
     type: object
   teams.CreateTeamRequest:
     properties:
@@ -695,11 +729,79 @@ paths:
       tags:
       - roles
   /teams:
+    delete:
+      consumes:
+      - application/json
+      description: 'Best effort, in one statement: every live team in `ids` is soft-deleted
+        and its active roster closed, as DELETE /teams/{id} does. A team that cannot
+        be deleted is listed in `failed` with the code and message the single delete
+        returns (40401 missing or already deleted); the others are still deleted.
+        Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.'
+      parameters:
+      - description: teams to soft-delete
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/teams.BulkDeleteTeamsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_BulkDeleteTeamsResponse'
+        "400":
+          description: 40001 VALIDATION_FAILED (no ids, more than 100, or one is not
+            a uuid)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305
+            PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Soft-delete several teams
+      tags:
+      - teams
     get:
+      description: 'Paged: `limit` rows per page (default 10). Pass `metadata.next_cursor`
+        back as `cursor` for the next page, with the same filters and sort; it is
+        null on the last page. `metadata.total` (rows matching the filters) is sent
+        on the first page only.'
       parameters:
       - description: only teams entered in this division (uuid)
         in: query
         name: division_id
+        type: string
+      - description: only teams hosted at this venue (uuid)
+        in: query
+        name: venue_id
+        type: string
+      - description: 'search: name or team_code contains this, case-insensitive'
+        in: query
+        name: q
+        type: string
+      - description: sort field, - prefix for descending (default team_code)
+        enum:
+        - team_code
+        - -team_code
+        - name
+        - -name
+        - created_at
+        - -created_at
+        in: query
+        name: sort
+        type: string
+      - description: rows per page, 1-200 (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: metadata.next_cursor of the previous page
+        in: query
+        name: cursor
         type: string
       produces:
       - application/json
@@ -726,11 +828,11 @@ paths:
     post:
       consumes:
       - application/json
-      description: '`division_id` is required: a team is created in a division. `team_code`
-        is the team code XXyyA (region, host location, team sequence), unique within
-        the division; lower case is accepted and stored upper case. The team then
-        enters a division with POST /teams/{id}/divisions, and the captain is set
-        with PATCH once the player is on the roster.'
+      description: '`division_id` is required: the team is created in that division
+        and entered into it. `team_code` is the team code XXyyA (region, host location,
+        team sequence), unique within the division; lower case is accepted and stored
+        upper case. It can enter further divisions with POST /teams/{id}/divisions,
+        and the captain is set with PATCH once the player is on the roster.'
       parameters:
       - description: team to create
         in: body
@@ -765,8 +867,10 @@ paths:
       - teams
   /teams-roster/{id}:
     get:
-      description: Active players only, with their stats in the division (zero before
-        the first match).
+      description: 'Active players only, with their stats in the division (zero before
+        the first match). Paged: `limit` rows per page (default 10); pass `metadata.next_cursor`
+        back as `cursor`, with the same search and sort; it is null on the last page.
+        `metadata.total` (rows matching the filters) is sent on the first page only.'
       parameters:
       - description: team id (uuid)
         in: path
@@ -777,6 +881,37 @@ paths:
         in: query
         name: division_id
         required: true
+        type: string
+      - description: 'search: full_name or member_id contains this, case-insensitive'
+        in: query
+        name: q
+        type: string
+      - description: sort field, - prefix for descending (default full_name)
+        enum:
+        - full_name
+        - -full_name
+        - member_id
+        - -member_id
+        - skill_level
+        - -skill_level
+        - matches_played
+        - -matches_played
+        - matches_won
+        - -matches_won
+        - total_points
+        - -total_points
+        - joined_at
+        - -joined_at
+        in: query
+        name: sort
+        type: string
+      - description: rows per page, 1-200 (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: metadata.next_cursor of the previous page
+        in: query
+        name: cursor
         type: string
       produces:
       - application/json
@@ -1149,6 +1284,44 @@ paths:
       security:
       - CSRFToken: []
       summary: Permanently delete a team
+      tags:
+      - teams
+  /teams/permanent:
+    delete:
+      consumes:
+      - application/json
+      description: 'Best effort, in one transaction: every team in `ids` that is soft-deleted
+        and has no fixture is removed, as DELETE /teams/{id}/permanent does. A team
+        that cannot be deleted is listed in `failed` (40401 missing, 40901 not deleted
+        yet or has fixtures); the others are still deleted. Always 200 once the request
+        itself is valid. 1-100 ids; repeats are ignored.'
+      parameters:
+      - description: soft-deleted teams to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/teams.BulkDeleteTeamsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_BulkDeleteTeamsResponse'
+        "400":
+          description: 40001 VALIDATION_FAILED (no ids, more than 100, or one is not
+            a uuid)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305
+            PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Permanently delete several teams
       tags:
       - teams
 securityDefinitions:

@@ -476,6 +476,7 @@
         },
         "/teams": {
             "get": {
+                "description": "Paged: `limit` rows per page (default 10). Pass `metadata.next_cursor` back as `cursor` for the next page, with the same filters and sort; it is null on the last page. `metadata.total` (rows matching the filters) is sent on the first page only.",
                 "produces": [
                     "application/json"
                 ],
@@ -488,6 +489,44 @@
                         "type": "string",
                         "description": "only teams entered in this division (uuid)",
                         "name": "division_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "only teams hosted at this venue (uuid)",
+                        "name": "venue_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search: name or team_code contains this, case-insensitive",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "team_code",
+                            "-team_code",
+                            "name",
+                            "-name",
+                            "created_at",
+                            "-created_at"
+                        ],
+                        "type": "string",
+                        "description": "sort field, - prefix for descending (default team_code)",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "rows per page, 1-200 (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "metadata.next_cursor of the previous page",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -524,7 +563,7 @@
                         "CSRFToken": []
                     }
                 ],
-                "description": "`division_id` is required: a team is created in a division. `team_code` is the team code XXyyA (region, host location, team sequence), unique within the division; lower case is accepted and stored upper case. The team then enters a division with POST /teams/{id}/divisions, and the captain is set with PATCH once the player is on the roster.",
+                "description": "`division_id` is required: the team is created in that division and entered into it. `team_code` is the team code XXyyA (region, host location, team sequence), unique within the division; lower case is accepted and stored upper case. It can enter further divisions with POST /teams/{id}/divisions, and the captain is set with PATCH once the player is on the roster.",
                 "consumes": [
                     "application/json"
                 ],
@@ -572,11 +611,60 @@
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Best effort, in one statement: every live team in `ids` is soft-deleted and its active roster closed, as DELETE /teams/{id} does. A team that cannot be deleted is listed in `failed` with the code and message the single delete returns (40401 missing or already deleted); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Soft-delete several teams",
+                "parameters": [
+                    {
+                        "description": "teams to soft-delete",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/teams.BulkDeleteTeamsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_BulkDeleteTeamsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "40001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/teams-roster/{id}": {
             "get": {
-                "description": "Active players only, with their stats in the division (zero before the first match).",
+                "description": "Active players only, with their stats in the division (zero before the first match). Paged: `limit` rows per page (default 10); pass `metadata.next_cursor` back as `cursor`, with the same search and sort; it is null on the last page. `metadata.total` (rows matching the filters) is sent on the first page only.",
                 "produces": [
                     "application/json"
                 ],
@@ -598,6 +686,46 @@
                         "name": "division_id",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "search: full_name or member_id contains this, case-insensitive",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "full_name",
+                            "-full_name",
+                            "member_id",
+                            "-member_id",
+                            "skill_level",
+                            "-skill_level",
+                            "matches_played",
+                            "-matches_played",
+                            "matches_won",
+                            "-matches_won",
+                            "total_points",
+                            "-total_points",
+                            "joined_at",
+                            "-joined_at"
+                        ],
+                        "type": "string",
+                        "description": "sort field, - prefix for descending (default full_name)",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "rows per page, 1-200 (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "metadata.next_cursor of the previous page",
+                        "name": "cursor",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -841,6 +969,57 @@
                     },
                     "409": {
                         "description": "40901 CONFLICT (captain, or already on a roster in the target division)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/teams/permanent": {
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Best effort, in one transaction: every team in `ids` that is soft-deleted and has no fixture is removed, as DELETE /teams/{id}/permanent does. A team that cannot be deleted is listed in `failed` (40401 missing, 40901 not deleted yet or has fixtures); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Permanently delete several teams",
+                "parameters": [
+                    {
+                        "description": "soft-deleted teams to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/teams.BulkDeleteTeamsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_BulkDeleteTeamsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "40001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -1194,17 +1373,6 @@
                 }
             }
         },
-        "github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata": {
-            "type": "object",
-            "properties": {
-                "next_cursor": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorBody": {
             "type": "object",
             "properties": {
@@ -1265,12 +1433,30 @@
                 }
             }
         },
-        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_permissions_PermissionResponse": {
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata": {
             "type": "object",
             "properties": {
                 "count": {
+                    "description": "rows in this response: len(Data)",
                     "type": "integer"
                 },
+                "has_more": {
+                    "description": "Whether another page follows: NextCursor != nil. Always false on a list that is not\npaged.",
+                    "type": "boolean"
+                },
+                "next_cursor": {
+                    "description": "Pass back as ?cursor= for the next page. Absent when HasMore is false.",
+                    "type": "string"
+                },
+                "total": {
+                    "description": "Rows matching the filters, across all pages. Sent on the first page only (no cursor):\none COUNT per list view rather than one per page.",
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_permissions_PermissionResponse": {
+            "type": "object",
+            "properties": {
                 "data": {
                     "type": "array",
                     "items": {
@@ -1278,19 +1464,18 @@
                     }
                 },
                 "metadata": {
-                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
-                },
-                "session_id": {
-                    "type": "string"
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
                 }
             }
         },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_roles_RoleResponse": {
             "type": "object",
             "properties": {
-                "count": {
-                    "type": "integer"
-                },
                 "data": {
                     "type": "array",
                     "items": {
@@ -1298,19 +1483,18 @@
                     }
                 },
                 "metadata": {
-                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
-                },
-                "session_id": {
-                    "type": "string"
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
                 }
             }
         },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_teams_RosterPlayerResponse": {
             "type": "object",
             "properties": {
-                "count": {
-                    "type": "integer"
-                },
                 "data": {
                     "type": "array",
                     "items": {
@@ -1318,19 +1502,18 @@
                     }
                 },
                 "metadata": {
-                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
-                },
-                "session_id": {
-                    "type": "string"
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
                 }
             }
         },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_teams_TeamResponse": {
             "type": "object",
             "properties": {
-                "count": {
-                    "type": "integer"
-                },
                 "data": {
                     "type": "array",
                     "items": {
@@ -1338,112 +1521,124 @@
                     }
                 },
                 "metadata": {
-                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
-                },
-                "session_id": {
-                    "type": "string"
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
                 }
             }
         },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-auth_CurrentUserResponse": {
             "type": "object",
             "properties": {
-                "count": {
-                    "type": "integer"
-                },
                 "data": {
                     "$ref": "#/definitions/auth.CurrentUserResponse"
                 },
                 "metadata": {
-                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
-                },
-                "session_id": {
-                    "type": "string"
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
                 }
             }
         },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-permissions_PermissionResponse": {
             "type": "object",
             "properties": {
-                "count": {
-                    "type": "integer"
-                },
                 "data": {
                     "$ref": "#/definitions/permissions.PermissionResponse"
                 },
                 "metadata": {
-                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
-                },
-                "session_id": {
-                    "type": "string"
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
                 }
             }
         },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-roles_RoleResponse": {
             "type": "object",
             "properties": {
-                "count": {
-                    "type": "integer"
-                },
                 "data": {
                     "$ref": "#/definitions/roles.RoleResponse"
                 },
                 "metadata": {
-                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_BulkDeleteTeamsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/teams.BulkDeleteTeamsResponse"
                 },
-                "session_id": {
-                    "type": "string"
+                "metadata": {
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
                 }
             }
         },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_DivisionTeamResponse": {
             "type": "object",
             "properties": {
-                "count": {
-                    "type": "integer"
-                },
                 "data": {
                     "$ref": "#/definitions/teams.DivisionTeamResponse"
                 },
                 "metadata": {
-                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
-                },
-                "session_id": {
-                    "type": "string"
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
                 }
             }
         },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_RosterPlayerResponse": {
             "type": "object",
             "properties": {
-                "count": {
-                    "type": "integer"
-                },
                 "data": {
                     "$ref": "#/definitions/teams.RosterPlayerResponse"
                 },
                 "metadata": {
-                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
-                },
-                "session_id": {
-                    "type": "string"
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
                 }
             }
         },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-teams_TeamResponse": {
             "type": "object",
             "properties": {
-                "count": {
-                    "type": "integer"
-                },
                 "data": {
                     "$ref": "#/definitions/teams.TeamResponse"
                 },
                 "metadata": {
-                    "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.CursorMetadata"
-                },
-                "session_id": {
-                    "type": "string"
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
                 }
             }
         },
@@ -1570,6 +1765,57 @@
                 "player_id": {
                     "type": "string",
                     "example": "2d9c4b1e-8f3a-4c57-b6d2-0e7a1f5c9b30"
+                }
+            }
+        },
+        "teams.BulkDeleteTeamFailureResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorCode"
+                        }
+                    ],
+                    "example": "40401"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "team not found"
+                }
+            }
+        },
+        "teams.BulkDeleteTeamsRequest": {
+            "type": "object",
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "5e8a2c1d-3b7f-4a90-8c6e-2d1f0b9a7e44"
+                    ]
+                }
+            }
+        },
+        "teams.BulkDeleteTeamsResponse": {
+            "type": "object",
+            "properties": {
+                "deleted_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "failed": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/teams.BulkDeleteTeamFailureResponse"
+                    }
                 }
             }
         },
