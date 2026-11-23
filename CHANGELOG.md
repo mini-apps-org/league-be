@@ -1,5 +1,11 @@
 # Changelog
 
+## [TBD](https://github.com/mini-apps-org/league-be/releases/tag/TBD) - 2026-11-XX
+
+- [#TBD](https://github.com/mini-apps-org/league-be/pull/TBD)
+  - refactor(errors): add error mappings for per-feature
+  - feat(errors): update 6-digit int64 error codes + remove dead error code
+
 ## [0.8.0](https://github.com/mini-apps-org/league-be/releases/tag/0.8.0) - 2026-11-22
 
 - [#PR7](https://github.com/mini-apps-org/league-be/pull/PR7)
