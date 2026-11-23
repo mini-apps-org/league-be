@@ -29,9 +29,9 @@ func NewHandler(cfg *config.Config, service Service) Handler {
 // @Param			limit		query		int		false	"rows per page, 1-200 (default 10)"
 // @Param			cursor		query		string	false	"metadata.next_cursor of the previous page"
 // @Success		200			{object}	handler.SuccessResponse[[]teams.TeamResponse]
-// @Failure		400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure		401			{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID"
-// @Failure		403			{object}	handler.ErrorResponse	"40305 PERMISSION_DENIED"
+// @Failure		400			{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure		401			{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
+// @Failure		403			{object}	handler.ErrorResponse	"403005 PERMISSION_DENIED"
 // @Router			/teams [get]
 func (h *Handler) ListTeams(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
@@ -77,9 +77,9 @@ func (h *Handler) ListTeams(w http.ResponseWriter, r *http.Request) {
 // @Produce		json
 // @Param			body	body		teams.CreateTeamRequest	true	"team to create"
 // @Success		201		{object}	handler.SuccessResponse[teams.TeamResponse]
-// @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure		403		{object}	handler.ErrorResponse	"40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED"
-// @Failure		409		{object}	handler.ErrorResponse	"40901 CONFLICT (team_code taken)"
+// @Failure		400		{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure		403		{object}	handler.ErrorResponse	"403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED"
+// @Failure		409		{object}	handler.ErrorResponse	"409001 CONFLICT (team_code taken)"
 // @Security		CSRFToken
 // @Router			/teams [post]
 func (h *Handler) CreateTeam(w http.ResponseWriter, r *http.Request) {
@@ -108,8 +108,8 @@ func (h *Handler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 // @Produce	json
 // @Param		id	path		string	true	"team id (uuid)"
 // @Success	200	{object}	handler.SuccessResponse[teams.TeamResponse]
-// @Failure	400	{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure	404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
+// @Failure	400	{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure	404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
 // @Router		/teams/{id} [get]
 func (h *Handler) GetTeamByID(w http.ResponseWriter, r *http.Request) {
 	id, err := handler.ParsePathUUID(r, "id")
@@ -135,9 +135,9 @@ func (h *Handler) GetTeamByID(w http.ResponseWriter, r *http.Request) {
 // @Param			id		path		string					true	"team id (uuid)"
 // @Param			body	body		teams.UpdateTeamRequest	true	"fields to change"
 // @Success		200		{object}	handler.SuccessResponse[teams.TeamResponse]
-// @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure		404		{object}	handler.ErrorResponse	"40401 NOT_FOUND"
-// @Failure		409		{object}	handler.ErrorResponse	"40901 CONFLICT (team_code taken)"
+// @Failure		400		{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure		404		{object}	handler.ErrorResponse	"404001 NOT_FOUND"
+// @Failure		409		{object}	handler.ErrorResponse	"409001 CONFLICT (team_code taken)"
 // @Security		CSRFToken
 // @Router			/teams/{id} [patch]
 func (h *Handler) UpdateTeam(w http.ResponseWriter, r *http.Request) {
@@ -173,7 +173,7 @@ func (h *Handler) UpdateTeam(w http.ResponseWriter, r *http.Request) {
 // @Produce		json
 // @Param			id	path	string	true	"team id (uuid)"
 // @Success		204	"deleted"
-// @Failure		404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
+// @Failure		404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
 // @Security		CSRFToken
 // @Router			/teams/{id} [delete]
 func (h *Handler) DeleteTeamByID(w http.ResponseWriter, r *http.Request) {
@@ -192,14 +192,14 @@ func (h *Handler) DeleteTeamByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // @Summary		Soft-delete several teams
-// @Description	Best effort, in one statement: every live team in `ids` is soft-deleted and its active roster closed, as DELETE /teams/{id} does. A team that cannot be deleted is listed in `failed` with the code and message the single delete returns (40401 missing or already deleted); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.
+// @Description	Best effort, in one statement: every live team in `ids` is soft-deleted and its active roster closed, as DELETE /teams/{id} does. A team that cannot be deleted is listed in `failed` with the code and message the single delete returns (404001 missing or already deleted); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.
 // @Tags			teams
 // @Accept			json
 // @Produce		json
 // @Param			body	body		teams.BulkDeleteTeamsRequest	true	"teams to soft-delete"
 // @Success		200		{object}	handler.SuccessResponse[teams.BulkDeleteTeamsResponse]
-// @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)"
-// @Failure		403		{object}	handler.ErrorResponse	"40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED"
+// @Failure		400		{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)"
+// @Failure		403		{object}	handler.ErrorResponse	"403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED"
 // @Security		CSRFToken
 // @Router			/teams [delete]
 func (h *Handler) BulkSoftDeleteTeams(w http.ResponseWriter, r *http.Request) {
@@ -219,14 +219,14 @@ func (h *Handler) BulkSoftDeleteTeams(w http.ResponseWriter, r *http.Request) {
 }
 
 // @Summary		Permanently delete several teams
-// @Description	Best effort, in one transaction: every team in `ids` that is soft-deleted and has no fixture is removed, as DELETE /teams/{id}/permanent does. A team that cannot be deleted is listed in `failed` (40401 missing, 40901 not deleted yet or has fixtures); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.
+// @Description	Best effort, in one transaction: every team in `ids` that is soft-deleted and has no fixture is removed, as DELETE /teams/{id}/permanent does. A team that cannot be deleted is listed in `failed` (404001 missing, 409001 not deleted yet or has fixtures); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.
 // @Tags			teams
 // @Accept			json
 // @Produce		json
 // @Param			body	body		teams.BulkDeleteTeamsRequest	true	"soft-deleted teams to remove"
 // @Success		200		{object}	handler.SuccessResponse[teams.BulkDeleteTeamsResponse]
-// @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)"
-// @Failure		403		{object}	handler.ErrorResponse	"40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED"
+// @Failure		400		{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)"
+// @Failure		403		{object}	handler.ErrorResponse	"403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED"
 // @Security		CSRFToken
 // @Router			/teams/permanent [delete]
 func (h *Handler) BulkPermanentDeleteTeams(w http.ResponseWriter, r *http.Request) {
@@ -251,8 +251,8 @@ func (h *Handler) BulkPermanentDeleteTeams(w http.ResponseWriter, r *http.Reques
 // @Produce		json
 // @Param			id	path	string	true	"team id (uuid)"
 // @Success		204	"permanently deleted"
-// @Failure		404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
-// @Failure		409	{object}	handler.ErrorResponse	"40901 CONFLICT (not deleted yet, or team has matches)"
+// @Failure		404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
+// @Failure		409	{object}	handler.ErrorResponse	"409001 CONFLICT (not deleted yet, or team has matches)"
 // @Security		CSRFToken
 // @Router			/teams/{id}/permanent [delete]
 func (h *Handler) PermanentDeleteTeam(w http.ResponseWriter, r *http.Request) {
@@ -278,9 +278,9 @@ func (h *Handler) PermanentDeleteTeam(w http.ResponseWriter, r *http.Request) {
 // @Param			id		path		string							true	"team id (uuid)"
 // @Param			body	body		teams.AddDivisionTeamRequest	true	"division to enter"
 // @Success		201		{object}	handler.SuccessResponse[teams.DivisionTeamResponse]
-// @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure		404		{object}	handler.ErrorResponse	"40401 NOT_FOUND"
-// @Failure		409		{object}	handler.ErrorResponse	"40901 CONFLICT (already entered)"
+// @Failure		400		{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure		404		{object}	handler.ErrorResponse	"404001 NOT_FOUND"
+// @Failure		409		{object}	handler.ErrorResponse	"409001 CONFLICT (already entered)"
 // @Security		CSRFToken
 // @Router			/teams/{id}/divisions [post]
 func (h *Handler) AddDivisionTeam(w http.ResponseWriter, r *http.Request) {
@@ -312,9 +312,9 @@ func (h *Handler) AddDivisionTeam(w http.ResponseWriter, r *http.Request) {
 // @Param			id			path	string	true	"team id (uuid)"
 // @Param			division_id	path	string	true	"division id (uuid)"
 // @Success		204			"withdrawn"
-// @Failure		400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure		404			{object}	handler.ErrorResponse	"40401 NOT_FOUND"
-// @Failure		409			{object}	handler.ErrorResponse	"40901 CONFLICT (team has matches)"
+// @Failure		400			{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure		404			{object}	handler.ErrorResponse	"404001 NOT_FOUND"
+// @Failure		409			{object}	handler.ErrorResponse	"409001 CONFLICT (team has matches)"
 // @Security		CSRFToken
 // @Router			/teams/{id}/divisions/{division_id} [delete]
 func (h *Handler) RemoveDivisionTeam(w http.ResponseWriter, r *http.Request) {
@@ -348,8 +348,8 @@ func (h *Handler) RemoveDivisionTeam(w http.ResponseWriter, r *http.Request) {
 // @Param			limit		query		int		false	"rows per page, 1-200 (default 10)"
 // @Param			cursor		query		string	false	"metadata.next_cursor of the previous page"
 // @Success		200			{object}	handler.SuccessResponse[[]teams.RosterPlayerResponse]
-// @Failure		400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure		404			{object}	handler.ErrorResponse	"40401 NOT_FOUND (team has not entered the division)"
+// @Failure		400			{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure		404			{object}	handler.ErrorResponse	"404001 NOT_FOUND (team has not entered the division)"
 // @Router			/teams-roster/{id} [get]
 func (h *Handler) ListRosterPlayers(w http.ResponseWriter, r *http.Request) {
 	teamID, err := handler.ParsePathUUID(r, "id")
@@ -403,11 +403,11 @@ func (h *Handler) ListRosterPlayers(w http.ResponseWriter, r *http.Request) {
 // @Param			division_id	query		string							true	"division id (uuid)"
 // @Param			body		body		teams.AddRosterPlayerRequest	true	"player to add"
 // @Success		201			{object}	handler.SuccessResponse[teams.RosterPlayerResponse]
-// @Failure		400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure		404			{object}	handler.ErrorResponse	"40401 NOT_FOUND (player, or team has not entered the division)"
-// @Failure		409			{object}	handler.ErrorResponse	"40901 CONFLICT (already on a roster in the division)"
+// @Failure		400			{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure		404			{object}	handler.ErrorResponse	"404001 NOT_FOUND (player, or team has not entered the division)"
+// @Failure		409			{object}	handler.ErrorResponse	"409001 CONFLICT (already on a roster in the division)"
 // @Security		CSRFToken
-// @Failure		403	{object}	handler.ErrorResponse	"40305 PERMISSION_DENIED (not the team captain, or an unpaid member)"
+// @Failure		403	{object}	handler.ErrorResponse	"403005 PERMISSION_DENIED (not the team captain, or an unpaid member)"
 // @Router			/teams-roster/{id} [post]
 func (h *Handler) AddRosterPlayer(w http.ResponseWriter, r *http.Request) {
 	teamID, err := handler.ParsePathUUID(r, "id")
@@ -451,11 +451,11 @@ func (h *Handler) AddRosterPlayer(w http.ResponseWriter, r *http.Request) {
 // @Param			division_id	query		string								true	"current division id (uuid)"
 // @Param			body		body		teams.TransferRosterPlayerRequest	true	"target team and division"
 // @Success		200			{object}	handler.SuccessResponse[teams.RosterPlayerResponse]
-// @Failure		400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure		404			{object}	handler.ErrorResponse	"40401 NOT_FOUND (team, roster entry, or target team has not entered the division)"
-// @Failure		409			{object}	handler.ErrorResponse	"40901 CONFLICT (captain, or already on a roster in the target division)"
+// @Failure		400			{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure		404			{object}	handler.ErrorResponse	"404001 NOT_FOUND (team, roster entry, or target team has not entered the division)"
+// @Failure		409			{object}	handler.ErrorResponse	"409001 CONFLICT (captain, or already on a roster in the target division)"
 // @Security		CSRFToken
-// @Failure		403	{object}	handler.ErrorResponse	"40305 PERMISSION_DENIED (not the team captain, or an unpaid member)"
+// @Failure		403	{object}	handler.ErrorResponse	"403005 PERMISSION_DENIED (not the team captain, or an unpaid member)"
 // @Router			/teams-roster/{id}/{player_id} [patch]
 func (h *Handler) TransferRosterPlayer(w http.ResponseWriter, r *http.Request) {
 	fromTeamID, err := handler.ParsePathUUID(r, "id")
@@ -506,11 +506,11 @@ func (h *Handler) TransferRosterPlayer(w http.ResponseWriter, r *http.Request) {
 // @Param			player_id	path	string	true	"player id (uuid)"
 // @Param			division_id	query	string	true	"division id (uuid)"
 // @Success		204			"removed"
-// @Failure		400			{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure		404			{object}	handler.ErrorResponse	"40401 NOT_FOUND (team or roster entry)"
-// @Failure		409			{object}	handler.ErrorResponse	"40901 CONFLICT (captain)"
+// @Failure		400			{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure		404			{object}	handler.ErrorResponse	"404001 NOT_FOUND (team or roster entry)"
+// @Failure		409			{object}	handler.ErrorResponse	"409001 CONFLICT (captain)"
 // @Security		CSRFToken
-// @Failure		403	{object}	handler.ErrorResponse	"40305 PERMISSION_DENIED (not the team captain, or an unpaid member)"
+// @Failure		403	{object}	handler.ErrorResponse	"403005 PERMISSION_DENIED (not the team captain, or an unpaid member)"
 // @Router			/teams-roster/{id}/{player_id} [delete]
 func (h *Handler) RemoveRosterPlayer(w http.ResponseWriter, r *http.Request) {
 	teamID, err := handler.ParsePathUUID(r, "id")

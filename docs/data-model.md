@@ -152,7 +152,7 @@ permission code is needed — see `.claude/rules/permissions.md`.
 ```mermaid
 flowchart TD
     req["POST / PATCH / DELETE /teams-roster/…"] --> perm{"roster.create / update / delete?<br/>(RequirePermission)"}
-    perm -- no --> deny["403 40305"]
+    perm -- no --> deny["403 403005"]
     perm -- yes --> any{"team.update?<br/>(SUPER_ADMIN)"}
     any -- yes --> ok["allowed"]
     any -- no --> link{"account linked<br/>to a player?"}

@@ -119,7 +119,7 @@ func (h *Handler) CallbackLogin(w http.ResponseWriter, r *http.Request) {
 //	@Tags		auth
 //	@Produce	json
 //	@Success	200	{object}	handler.SuccessResponse[auth.CurrentUserResponse]
-//	@Failure	401	{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID | 40103 USER_NOT_IN_CONTEXT"
+//	@Failure	401	{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID | 401003 USER_NOT_IN_CONTEXT"
 //	@Router		/me [get]
 func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -155,8 +155,8 @@ func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 //	@Tags			auth
 //	@Produce		json
 //	@Success		204	"signed out"
-//	@Failure		403	{object}	handler.ErrorResponse	"40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH"
-//	@Failure		500	{object}	handler.ErrorResponse	"50001 INTERNAL"
+//	@Failure		403	{object}	handler.ErrorResponse	"403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH"
+//	@Failure		500	{object}	handler.ErrorResponse	"500001 INTERNAL"
 //	@Security		CSRFToken
 //	@Router			/auth/logout [post]
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {

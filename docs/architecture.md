@@ -46,7 +46,7 @@ The two that are easiest to break:
 - **The service never sees `*http.Request`.** `CompleteLogin(ctx, CallbackInput{…})`
   takes a struct the handler fills in — which is why it is testable without a server.
 - **The repository never decides an HTTP status.** It returns `ErrNoSession`; the
-  mapping to `40102` happens one layer up.
+  mapping to `401002` happens one layer up.
 
 ---
 
@@ -99,7 +99,7 @@ RequireSession                 sid cookie → authHandler.AuthenticateSession �
     REPOSITORY   SELECT … WHERE id=$1 AND created_at>$2 AND last_seen_at>$3
                  pgx.ErrNoRows → ErrNoSession
   SERVICE        repo.UpdateSessionLastSeenAt(…)
-RequireSession                 ok → user id into ctx;  err → clear cookie, 401 40102
+RequireSession                 ok → user id into ctx;  err → clear cookie, 401 401002
 HANDLER          ExtractUserIDFromContext(ctx) → service.GetUser(ctx, id) → repo.GetUserByID(…)
                  → ReturnWithJSON(200, SuccessResponse[CurrentUserResponse]{Data: CurrentUserResponse{…}})
 ```
@@ -115,11 +115,11 @@ Note that `GetSession` takes two `time.Time` cutoffs, not TTLs: deciding they ar
 REPOSITORY   pgx.ErrNoRows → ErrNoSession;  else fmt.Errorf("auth: get session: %w", err)
 SERVICE      errors.Is(err, ErrNoSession) → handler.Error(handler.CodeSessionInvalid, err)
 HANDLER      h.ReturnWithError(w, r, err)
-             → {"error":{"code":"40102","message":"Your session has expired…"}}
+             → {"error":{"code":401002,"message":"Your session has expired…"}}
 ```
 
 The repository knows *which query* failed. The service knows what the failure *means*.
-The handler knows neither. Anything unclassified becomes `50001` with the cause logged
+The handler knows neither. Anything unclassified becomes `500001` with the cause logged
 and never serialized.
 
 ---

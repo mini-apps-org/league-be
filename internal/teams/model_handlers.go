@@ -84,12 +84,12 @@ type BulkDeleteTeamsResponse struct {
 
 type BulkDeleteTeamFailureResponse struct {
 	ID      string            `json:"id"`
-	Code    handler.ErrorCode `json:"code" example:"40401"`
+	Code    handler.ErrorCode `json:"code" example:"404001"`
 	Message string            `json:"message" example:"team not found"`
 }
 
 // newBulkDeleteTeamsResponse serves each failure as its public code and message;
-// handler.AsAPIError turns an unclassified error into 50001 without its cause.
+// handler.AsAPIError turns an unclassified error into 500001 without its cause.
 func newBulkDeleteTeamsResponse(result BulkDeleteTeamsResult) BulkDeleteTeamsResponse {
 	failed := make([]BulkDeleteTeamFailureResponse, 0, len(result.Failures))
 	for _, failure := range result.Failures {

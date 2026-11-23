@@ -182,7 +182,7 @@ func errorCode(err error) handler.ErrorCode {
 	if errors.As(err, &apiErr) {
 		return apiErr.Code
 	}
-	return ""
+	return 0
 }
 
 // The team code is typed by an operator and printed on scoresheets. A code outside
@@ -193,8 +193,8 @@ func TestCreateTeamValidatesTeamCode(t *testing.T) {
 		wantStored string
 		wantCode   handler.ErrorCode
 	}{
-		{"41503", "41503", ""},
-		{" 41a0b ", "41A0B", ""},
+		{"41503", "41503", 0},
+		{" 41a0b ", "41A0B", 0},
 		{"4150", "", handler.CodeValidationFailed},
 		{"415034", "", handler.CodeValidationFailed},
 		{"41-50", "", handler.CodeValidationFailed},
@@ -210,9 +210,9 @@ func TestCreateTeamValidatesTeamCode(t *testing.T) {
 			})
 
 			if got := errorCode(err); got != tt.wantCode {
-				t.Fatalf("error code = %q, want %q (err: %v)", got, tt.wantCode, err)
+				t.Fatalf("error code = %d, want %d (err: %v)", got, tt.wantCode, err)
 			}
-			if tt.wantCode == "" && repo.created.TeamCode != tt.wantStored {
+			if tt.wantCode == 0 && repo.created.TeamCode != tt.wantStored {
 				t.Errorf("stored team_code = %q, want %q", repo.created.TeamCode, tt.wantStored)
 			}
 		})
@@ -246,7 +246,7 @@ func TestCaptainCannotLeaveRoster(t *testing.T) {
 			err := tt.run(NewService(repo, fakePermissions{}, testLogger))
 
 			if got := errorCode(err); got != handler.CodeConflict {
-				t.Fatalf("error code = %q, want %q (err: %v)", got, handler.CodeConflict, err)
+				t.Fatalf("error code = %d, want %d (err: %v)", got, handler.CodeConflict, err)
 			}
 			if repo.removed || repo.transferred {
 				t.Error("the roster write reached the repository")
@@ -264,7 +264,7 @@ func TestUpdateTeamCaptainMustBeOnRoster(t *testing.T) {
 		wantCode handler.ErrorCode
 		wantSave bool
 	}{
-		{"on roster", testPlayerID, "", true},
+		{"on roster", testPlayerID, 0, true},
 		{"not on roster", "55555555-5555-4555-8555-555555555555", handler.CodeValidationFailed, false},
 		{"not a uuid", "abc", handler.CodeValidationFailed, false},
 	}
@@ -277,7 +277,7 @@ func TestUpdateTeamCaptainMustBeOnRoster(t *testing.T) {
 			})
 
 			if got := errorCode(err); got != tt.wantCode {
-				t.Fatalf("error code = %q, want %q (err: %v)", got, tt.wantCode, err)
+				t.Fatalf("error code = %d, want %d (err: %v)", got, tt.wantCode, err)
 			}
 			if repo.updated != tt.wantSave {
 				t.Errorf("updated = %v, want %v", repo.updated, tt.wantSave)
@@ -297,7 +297,7 @@ func TestTransferToSameRosterRejected(t *testing.T) {
 	})
 
 	if got := errorCode(err); got != handler.CodeValidationFailed {
-		t.Fatalf("error code = %q, want %q (err: %v)", got, handler.CodeValidationFailed, err)
+		t.Fatalf("error code = %d, want %d (err: %v)", got, handler.CodeValidationFailed, err)
 	}
 	if repo.transferred {
 		t.Error("the transfer reached the repository")
@@ -335,16 +335,16 @@ func TestRosterWritesAreCaptainScoped(t *testing.T) {
 		run      func(Service, string) error
 		wantCode handler.ErrorCode
 	}{
-		{"captain adds to own team", testCaptainUser, add(ownPlayer), ""},
+		{"captain adds to own team", testCaptainUser, add(ownPlayer), 0},
 		{"captain adds to another team", testCaptainUser, add(otherTeamPlayer), handler.CodePermissionDenied},
 		{"captain adds unpaid member", testCaptainUser, add(unpaidPlayer), handler.CodePermissionDenied},
-		{"admin adds unpaid member", testAdminUser, add(unpaidPlayer), ""},
-		{"captain removes from own team", testCaptainUser, remove(ownPlayer), ""},
+		{"admin adds unpaid member", testAdminUser, add(unpaidPlayer), 0},
+		{"captain removes from own team", testCaptainUser, remove(ownPlayer), 0},
 		{"captain removes from another team", testCaptainUser, remove(otherTeamPlayer), handler.CodePermissionDenied},
 		{"user with no player removes", testNoPlayerUser, remove(ownPlayer), handler.CodePermissionDenied},
 		{"captain poaches onto own team", testCaptainUser, transfer(otherTeamPlayer, testTeamID), handler.CodePermissionDenied},
 		{"captain pushes onto another team", testCaptainUser, transfer(ownPlayer, testOtherTeam), handler.CodePermissionDenied},
-		{"admin transfers", testAdminUser, transfer(ownPlayer, testOtherTeam), ""},
+		{"admin transfers", testAdminUser, transfer(ownPlayer, testOtherTeam), 0},
 	}
 
 	for _, tt := range tests {
@@ -353,11 +353,11 @@ func TestRosterWritesAreCaptainScoped(t *testing.T) {
 			err := tt.run(NewService(repo, fakePermissions{}, testLogger), tt.user)
 
 			if got := errorCode(err); got != tt.wantCode {
-				t.Fatalf("error code = %q, want %q (err: %v)", got, tt.wantCode, err)
+				t.Fatalf("error code = %d, want %d (err: %v)", got, tt.wantCode, err)
 			}
 			wrote := repo.added || repo.removed || repo.transferred
-			if wrote != (tt.wantCode == "") {
-				t.Errorf("write reached repository = %v, want %v", wrote, tt.wantCode == "")
+			if wrote != (tt.wantCode == 0) {
+				t.Errorf("write reached repository = %v, want %v", wrote, tt.wantCode == 0)
 			}
 		})
 	}
@@ -404,9 +404,9 @@ func TestListFiltersAreValidated(t *testing.T) {
 		wantCode  handler.ErrorCode
 		wantQuery string
 	}{
-		{"no filters", ListTeamsServiceParams{}, "", ""},
-		{"trimmed search", ListTeamsServiceParams{Query: "  cue  "}, "", "cue"},
-		{"blank search", ListTeamsServiceParams{Query: "   "}, "", ""},
+		{"no filters", ListTeamsServiceParams{}, 0, ""},
+		{"trimmed search", ListTeamsServiceParams{Query: "  cue  "}, 0, "cue"},
+		{"blank search", ListTeamsServiceParams{Query: "   "}, 0, ""},
 		{"division not a uuid", ListTeamsServiceParams{DivisionID: "abc"}, handler.CodeValidationFailed, ""},
 		{"venue not a uuid", ListTeamsServiceParams{VenueID: "abc"}, handler.CodeValidationFailed, ""},
 		{"search too long", ListTeamsServiceParams{Query: longQuery}, handler.CodeValidationFailed, ""},
@@ -418,9 +418,9 @@ func TestListFiltersAreValidated(t *testing.T) {
 			_, err := NewService(repo, fakePermissions{}, testLogger).ListTeams(context.Background(), tt.params)
 
 			if got := errorCode(err); got != tt.wantCode {
-				t.Fatalf("error code = %q, want %q (err: %v)", got, tt.wantCode, err)
+				t.Fatalf("error code = %d, want %d (err: %v)", got, tt.wantCode, err)
 			}
-			if tt.wantCode != "" {
+			if tt.wantCode != 0 {
 				if repo.listedTeams != nil {
 					t.Error("an invalid filter reached the repository")
 				}
@@ -438,7 +438,7 @@ func TestListFiltersAreValidated(t *testing.T) {
 			DivisionID: testDivisionID, TeamID: testTeamID, Query: longQuery,
 		})
 		if got := errorCode(err); got != handler.CodeValidationFailed {
-			t.Fatalf("error code = %q, want %q (err: %v)", got, handler.CodeValidationFailed, err)
+			t.Fatalf("error code = %d, want %d (err: %v)", got, handler.CodeValidationFailed, err)
 		}
 		if repo.listedRoster != nil {
 			t.Error("an invalid search reached the repository")
@@ -459,7 +459,7 @@ func TestListCursorIsValidated(t *testing.T) {
 		cursor   string
 		wantCode handler.ErrorCode
 	}{
-		{"valid", cursor("2026-11-22T07:00:00.123456Z", testTeamID), ""},
+		{"valid", cursor("2026-11-22T07:00:00.123456Z", testTeamID), 0},
 		{"value not a time", cursor("yesterday", testTeamID), handler.CodeValidationFailed},
 		{"id not a uuid", cursor("2026-11-22T07:00:00Z", "abc"), handler.CodeValidationFailed},
 	}
@@ -473,10 +473,10 @@ func TestListCursorIsValidated(t *testing.T) {
 			})
 
 			if got := errorCode(err); got != tt.wantCode {
-				t.Fatalf("error code = %q, want %q (err: %v)", got, tt.wantCode, err)
+				t.Fatalf("error code = %d, want %d (err: %v)", got, tt.wantCode, err)
 			}
-			if (repo.listedTeams != nil) != (tt.wantCode == "") {
-				t.Errorf("reached repository = %v, want %v", repo.listedTeams != nil, tt.wantCode == "")
+			if (repo.listedTeams != nil) != (tt.wantCode == 0) {
+				t.Errorf("reached repository = %v, want %v", repo.listedTeams != nil, tt.wantCode == 0)
 			}
 		})
 	}
@@ -594,7 +594,7 @@ func TestCreateTeamRequiresDivision(t *testing.T) {
 		divisionID string
 		wantCode   handler.ErrorCode
 	}{
-		{"valid", testDivisionID, ""},
+		{"valid", testDivisionID, 0},
 		{"missing", "", handler.CodeValidationFailed},
 		{"not a uuid", "abc", handler.CodeValidationFailed},
 	}
@@ -609,10 +609,10 @@ func TestCreateTeamRequiresDivision(t *testing.T) {
 			})
 
 			if got := errorCode(err); got != tt.wantCode {
-				t.Fatalf("error code = %q, want %q (err: %v)", got, tt.wantCode, err)
+				t.Fatalf("error code = %d, want %d (err: %v)", got, tt.wantCode, err)
 			}
-			if (repo.created != nil) != (tt.wantCode == "") {
-				t.Errorf("reached repository = %v, want %v", repo.created != nil, tt.wantCode == "")
+			if (repo.created != nil) != (tt.wantCode == 0) {
+				t.Errorf("reached repository = %v, want %v", repo.created != nil, tt.wantCode == 0)
 			}
 			if repo.created != nil && repo.created.DivisionID != tt.divisionID {
 				t.Errorf("division_id passed on = %q, want %q", repo.created.DivisionID, tt.divisionID)
@@ -643,9 +643,9 @@ func TestBulkDeleteTeamsRequestIsValidated(t *testing.T) {
 		{"no ids", nil, handler.CodeValidationFailed, 0},
 		{"one not a uuid", []string{testTeamID, "abc"}, handler.CodeValidationFailed, 0},
 		{"over the limit", uniqueIDs(maxBulkTeamIDs + 1), handler.CodeValidationFailed, 0},
-		{"at the limit", uniqueIDs(maxBulkTeamIDs), "", maxBulkTeamIDs},
-		{"repeats count once", append(uniqueIDs(maxBulkTeamIDs), uniqueIDs(maxBulkTeamIDs)...), "", maxBulkTeamIDs},
-		{"a repeat in upper case counts once", []string{testTeamID, strings.ToUpper(testTeamID)}, "", 1},
+		{"at the limit", uniqueIDs(maxBulkTeamIDs), 0, maxBulkTeamIDs},
+		{"repeats count once", append(uniqueIDs(maxBulkTeamIDs), uniqueIDs(maxBulkTeamIDs)...), 0, maxBulkTeamIDs},
+		{"a repeat in upper case counts once", []string{testTeamID, strings.ToUpper(testTeamID)}, 0, 1},
 	}
 
 	for _, tt := range tests {
@@ -654,7 +654,7 @@ func TestBulkDeleteTeamsRequestIsValidated(t *testing.T) {
 			_, err := NewService(repo, fakePermissions{}, testLogger).BulkSoftDeleteTeams(context.Background(), tt.ids)
 
 			if got := errorCode(err); got != tt.wantCode {
-				t.Fatalf("error code = %q, want %q (err: %v)", got, tt.wantCode, err)
+				t.Fatalf("error code = %d, want %d (err: %v)", got, tt.wantCode, err)
 			}
 			if len(repo.softDeletes.called) != tt.wantReached {
 				t.Errorf("teams reaching the repository = %d, want %d", len(repo.softDeletes.called), tt.wantReached)
@@ -733,7 +733,7 @@ func TestBulkDeleteTeamsIsBestEffort(t *testing.T) {
 		_, err := NewService(repo, fakePermissions{}, testLogger).
 			BulkSoftDeleteTeams(context.Background(), []string{testTeamID})
 		if got := handler.AsAPIError(err); got.Code != handler.CodeInternal || strings.Contains(got.Message, "connection reset") {
-			t.Errorf("error = %s %q, want %s without its cause", got.Code, got.Message, handler.CodeInternal)
+			t.Errorf("error = %d %q, want %d without its cause", got.Code, got.Message, handler.CodeInternal)
 		}
 	})
 }
