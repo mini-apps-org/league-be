@@ -365,7 +365,7 @@ func TestRosterWritesAreCaptainScoped(t *testing.T) {
 
 // A wrapped sentinel must still map to its status: the repository wraps errors from
 // inside a transaction, and a lost mapping would serve 500 for a plain 409.
-func TestAsAPIErrorUnwrapsSentinels(t *testing.T) {
+func TestMapFeatureErrorUnwrapsSentinels(t *testing.T) {
 	tests := []struct {
 		sentinel error
 		want     handler.ErrorCode
@@ -386,8 +386,8 @@ func TestAsAPIErrorUnwrapsSentinels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.sentinel.Error(), func(t *testing.T) {
 			wrapped := errors.Join(errors.New("teams: transfer player"), tt.sentinel)
-			if got := errorCode(asAPIError(wrapped)); got != tt.want {
-				t.Errorf("code = %q, want %q", got, tt.want)
+			if got := errorCode(handler.MapFeatureError(wrapped, teamErrorMappings)); got != tt.want {
+				t.Errorf("code = %d, want %d", got, tt.want)
 			}
 		})
 	}

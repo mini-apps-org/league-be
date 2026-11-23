@@ -2,24 +2,9 @@ package teams
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-)
-
-var (
-	ErrTeamNotFound            = errors.New("teams: team not found")
-	ErrTeamNotSoftDeleted      = errors.New("teams: team not soft-deleted")
-	ErrDuplicateTeamCode       = errors.New("teams: duplicate team code")
-	ErrDivisionNotFound        = errors.New("teams: division not found")
-	ErrVenueNotFound           = errors.New("teams: venue not found")
-	ErrTeamHasMatches          = errors.New("teams: team has matches")
-	ErrTeamNotInDivision       = errors.New("teams: team has not entered division")
-	ErrTeamAlreadyInDivision   = errors.New("teams: team already entered division")
-	ErrPlayerNotFound          = errors.New("teams: player not found")
-	ErrRosterPlayerNotFound    = errors.New("teams: player not on active roster")
-	ErrPlayerAlreadyInDivision = errors.New("teams: player already on an active roster in division")
 )
 
 // TODO vincent: Need write as the array format and using String.joins to easier remove or add the new field as needed

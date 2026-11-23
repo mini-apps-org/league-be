@@ -87,12 +87,12 @@ func (s *service) CreateTeam(ctx context.Context, params CreateTeamServiceParams
 	}
 
 	team, err := s.repo.CreateTeam(ctx, params)
-	return team, asAPIError(err)
+	return team, handler.MapFeatureError(err, teamErrorMappings)
 }
 
 func (s *service) GetTeamByID(ctx context.Context, id string) (*Team, error) {
 	team, err := s.repo.GetTeamByID(ctx, id)
-	return team, asAPIError(err)
+	return team, handler.MapFeatureError(err, teamErrorMappings)
 }
 
 func (s *service) ListTeams(ctx context.Context, params ListTeamsServiceParams) (*model.CursorResponse[Team], error) {
@@ -165,15 +165,15 @@ func (s *service) UpdateTeam(ctx context.Context, id string, params UpdateTeamSe
 	}
 
 	team, err := s.repo.UpdateTeam(ctx, id, params)
-	return team, asAPIError(err)
+	return team, handler.MapFeatureError(err, teamErrorMappings)
 }
 
 func (s *service) DeleteTeamByID(ctx context.Context, id string) error {
-	return asAPIError(s.repo.SoftDeleteTeam(ctx, id))
+	return handler.MapFeatureError(s.repo.SoftDeleteTeam(ctx, id), teamErrorMappings)
 }
 
 func (s *service) PermanentDeleteTeam(ctx context.Context, id string) error {
-	return asAPIError(s.repo.PermanentDeleteTeam(ctx, id))
+	return handler.MapFeatureError(s.repo.PermanentDeleteTeam(ctx, id), teamErrorMappings)
 }
 
 // BulkSoftDeleteTeams soft-deletes the teams in one statement, best effort: a team that
@@ -187,7 +187,7 @@ func (s *service) BulkSoftDeleteTeams(ctx context.Context, ids []string) (*BulkD
 
 	result, err := s.repo.BulkSoftDeleteTeams(ctx, ids)
 	if err != nil {
-		return nil, asAPIError(err)
+		return nil, handler.MapFeatureError(err, teamErrorMappings)
 	}
 	return withAPIErrors(result), nil
 }
@@ -202,7 +202,7 @@ func (s *service) BulkPermanentDeleteTeams(ctx context.Context, ids []string) (*
 
 	result, err := s.repo.BulkPermanentDeleteTeams(ctx, ids)
 	if err != nil {
-		return nil, asAPIError(err)
+		return nil, handler.MapFeatureError(err, teamErrorMappings)
 	}
 	return withAPIErrors(result), nil
 }
@@ -211,7 +211,7 @@ func (s *service) BulkPermanentDeleteTeams(ctx context.Context, ids []string) (*
 // delete serves for it.
 func withAPIErrors(result *BulkDeleteTeamsResult) *BulkDeleteTeamsResult {
 	for i := range result.Failures {
-		result.Failures[i].Err = asAPIError(result.Failures[i].Err)
+		result.Failures[i].Err = handler.MapFeatureError(result.Failures[i].Err, teamErrorMappings)
 	}
 	return result
 }
@@ -252,11 +252,11 @@ func (s *service) AddDivisionTeam(ctx context.Context, divisionID, teamID string
 	}
 
 	entry, err := s.repo.AddDivisionTeam(ctx, divisionID, teamID)
-	return entry, asAPIError(err)
+	return entry, handler.MapFeatureError(err, teamErrorMappings)
 }
 
 func (s *service) RemoveDivisionTeam(ctx context.Context, divisionID, teamID string) error {
-	return asAPIError(s.repo.RemoveDivisionTeam(ctx, divisionID, teamID))
+	return handler.MapFeatureError(s.repo.RemoveDivisionTeam(ctx, divisionID, teamID), teamErrorMappings)
 }
 
 func (s *service) ListRosterPlayers(ctx context.Context, params ListRosterPlayersServiceParams) (*model.CursorResponse[RosterPlayer], error) {
@@ -274,7 +274,7 @@ func (s *service) ListRosterPlayers(ctx context.Context, params ListRosterPlayer
 	}
 
 	if _, err := s.repo.GetDivisionTeam(ctx, params.DivisionID, params.TeamID); err != nil {
-		return nil, asAPIError(err)
+		return nil, handler.MapFeatureError(err, teamErrorMappings)
 	}
 
 	total, err := countOnFirstPage(params.Page, func() (int64, error) { return s.repo.CountRosterPlayers(ctx, params) })
@@ -385,7 +385,7 @@ func (s *service) AddRosterPlayer(ctx context.Context, actorUserID string, param
 	if !canManageAllRosters {
 		isPaid, err := s.repo.IsPaidPlayer(ctx, params.PlayerID)
 		if err != nil {
-			return nil, asAPIError(err)
+			return nil, handler.MapFeatureError(err, teamErrorMappings)
 		}
 		if !isPaid {
 			return nil, handler.ErrorWithMessage(handler.CodePermissionDenied,
@@ -394,11 +394,11 @@ func (s *service) AddRosterPlayer(ctx context.Context, actorUserID string, param
 	}
 
 	if err := s.repo.AddRosterPlayer(ctx, params); err != nil {
-		return nil, asAPIError(err)
+		return nil, handler.MapFeatureError(err, teamErrorMappings)
 	}
 
 	player, err := s.repo.GetRosterPlayer(ctx, params)
-	return player, asAPIError(err)
+	return player, handler.MapFeatureError(err, teamErrorMappings)
 }
 
 func (s *service) RemoveRosterPlayer(ctx context.Context, actorUserID string, params RosterEntryServiceParams) error {
@@ -412,7 +412,7 @@ func (s *service) RemoveRosterPlayer(ctx context.Context, actorUserID string, pa
 		return err
 	}
 
-	return asAPIError(s.repo.RemoveRosterPlayer(ctx, params))
+	return handler.MapFeatureError(s.repo.RemoveRosterPlayer(ctx, params), teamErrorMappings)
 }
 
 func (s *service) TransferRosterPlayer(ctx context.Context, actorUserID string, params TransferRosterPlayerServiceParams) (*RosterPlayer, error) {
@@ -441,7 +441,7 @@ func (s *service) TransferRosterPlayer(ctx context.Context, actorUserID string, 
 	}
 
 	if err := s.repo.TransferRosterPlayer(ctx, params); err != nil {
-		return nil, asAPIError(err)
+		return nil, handler.MapFeatureError(err, teamErrorMappings)
 	}
 
 	player, err := s.repo.GetRosterPlayer(ctx, RosterEntryServiceParams{
@@ -449,7 +449,7 @@ func (s *service) TransferRosterPlayer(ctx context.Context, actorUserID string, 
 		TeamID:     params.ToTeamID,
 		PlayerID:   params.From.PlayerID,
 	})
-	return player, asAPIError(err)
+	return player, handler.MapFeatureError(err, teamErrorMappings)
 }
 
 // authorizeRosterWrite allows a roster change on teamIDs when the user holds
@@ -475,7 +475,7 @@ func (s *service) authorizeRosterWrite(ctx context.Context, actorUserID string, 
 	for _, teamID := range teamIDs {
 		team, err := s.repo.GetTeamByID(ctx, teamID)
 		if err != nil {
-			return false, asAPIError(err)
+			return false, handler.MapFeatureError(err, teamErrorMappings)
 		}
 		if team.CaptainPlayerID == nil || *team.CaptainPlayerID != actorPlayerID {
 			return false, notTeamCaptainError()
@@ -494,7 +494,7 @@ func notTeamCaptainError() error {
 func (s *service) rejectCaptain(ctx context.Context, teamID, playerID string) error {
 	team, err := s.repo.GetTeamByID(ctx, teamID)
 	if err != nil {
-		return asAPIError(err)
+		return handler.MapFeatureError(err, teamErrorMappings)
 	}
 	if team.CaptainPlayerID != nil && *team.CaptainPlayerID == playerID {
 		return handler.ErrorWithMessage(handler.CodeConflict,
@@ -551,36 +551,4 @@ func normaliseSearchQuery(query string) (string, error) {
 
 func newValidationError(message string) error {
 	return handler.ErrorWithMessage(handler.CodeValidationFailed, message, nil)
-}
-
-// TODO vincent: will refactor later
-func asAPIError(err error) error {
-	switch {
-	case err == nil:
-		return nil
-	case errors.Is(err, ErrTeamNotFound):
-		return handler.ErrorWithMessage(handler.CodeNotFound, "team not found", err)
-	case errors.Is(err, ErrPlayerNotFound):
-		return handler.ErrorWithMessage(handler.CodeNotFound, "player not found", err)
-	case errors.Is(err, ErrTeamNotInDivision):
-		return handler.ErrorWithMessage(handler.CodeNotFound, "the team has not entered this division", err)
-	case errors.Is(err, ErrRosterPlayerNotFound):
-		return handler.ErrorWithMessage(handler.CodeNotFound, "player is not on this team's active roster in the division", err)
-	case errors.Is(err, ErrDivisionNotFound):
-		return handler.ErrorWithMessage(handler.CodeValidationFailed, "division_id does not match a division", err)
-	case errors.Is(err, ErrVenueNotFound):
-		return handler.ErrorWithMessage(handler.CodeValidationFailed, "venue_id does not match a venue", err)
-	case errors.Is(err, ErrDuplicateTeamCode):
-		return handler.ErrorWithMessage(handler.CodeConflict, "a team with that team_code already exists", err)
-	case errors.Is(err, ErrTeamAlreadyInDivision):
-		return handler.ErrorWithMessage(handler.CodeConflict, "the team has already entered this division", err)
-	case errors.Is(err, ErrTeamNotSoftDeleted):
-		return handler.ErrorWithMessage(handler.CodeConflict, "delete the team before deleting it permanently", err)
-	case errors.Is(err, ErrTeamHasMatches):
-		return handler.ErrorWithMessage(handler.CodeConflict, "the team has scheduled or played matches", err)
-	case errors.Is(err, ErrPlayerAlreadyInDivision):
-		return handler.ErrorWithMessage(handler.CodeConflict, "the player is already on an active roster in this division", err)
-	default:
-		return err
-	}
 }

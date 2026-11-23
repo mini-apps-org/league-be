@@ -12,8 +12,6 @@ import (
 	"github.com/nguyentanvinh/league-be/internal/platform/handler/repo"
 )
 
-var ErrPermissionNotFound = errors.New("permissions: not found")
-
 const permissionListLimit = 200
 
 const permissionColumns = "id, code, name, description, created_at, updated_at"
