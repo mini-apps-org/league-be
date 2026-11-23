@@ -2,7 +2,6 @@ package permissions
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"github.com/nguyentanvinh/league-be/internal/platform/handler"
@@ -29,10 +28,7 @@ func (s *service) ListPermissions(ctx context.Context) ([]Permission, error) {
 
 func (s *service) GetPermissionByID(ctx context.Context, id string) (*Permission, error) {
 	permission, err := s.repo.GetPermissionByID(ctx, id)
-	if errors.Is(err, ErrPermissionNotFound) {
-		return nil, handler.Error(handler.CodeNotFound, err)
-	}
-	return permission, err
+	return permission, handler.MapFeatureError(err, permissionErrorMappings)
 }
 
 func (s *service) GetPermissionCodesByUserID(ctx context.Context, userID string) ([]string, error) {

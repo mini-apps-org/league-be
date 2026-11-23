@@ -13,12 +13,6 @@ import (
 	"github.com/nguyentanvinh/league-be/internal/platform/handler/repo"
 )
 
-var (
-	ErrRoleNotFound       = errors.New("roles: not found")
-	ErrDuplicateRoleCode  = errors.New("roles: duplicate code")
-	ErrRoleNotSoftDeleted = errors.New("roles: not soft-deleted")
-)
-
 // pgUniqueViolationCode is Postgres SQLSTATE 23505.
 const pgUniqueViolationCode = "23505"
 

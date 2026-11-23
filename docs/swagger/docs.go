@@ -85,13 +85,13 @@ const docTemplate = `{
                         "description": "signed out"
                     },
                     "403": {
-                        "description": "40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH",
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "50001 INTERNAL",
+                        "description": "500001 INTERNAL",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -135,7 +135,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID | 40103 USER_NOT_IN_CONTEXT",
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID | 401003 USER_NOT_IN_CONTEXT",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -161,13 +161,13 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID",
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "40305 PERMISSION_DENIED",
+                        "description": "403005 PERMISSION_DENIED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -201,13 +201,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND",
+                        "description": "404001 NOT_FOUND",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -232,13 +232,13 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID",
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "40305 PERMISSION_DENIED",
+                        "description": "403005 PERMISSION_DENIED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -281,19 +281,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED",
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "40901 CONFLICT",
+                        "description": "409001 CONFLICT",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -327,13 +327,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND",
+                        "description": "404001 NOT_FOUND",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -368,13 +368,13 @@ const docTemplate = `{
                         "description": "deleted"
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND",
+                        "description": "404001 NOT_FOUND",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "40901 CONFLICT (SUPER_ADMIN)",
+                        "description": "409001 CONFLICT (SUPER_ADMIN)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -424,13 +424,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND",
+                        "description": "404001 NOT_FOUND",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -467,13 +467,13 @@ const docTemplate = `{
                         "description": "permanently deleted"
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND",
+                        "description": "404001 NOT_FOUND",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "40901 CONFLICT (not deleted yet)",
+                        "description": "409001 CONFLICT (not deleted yet)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -545,19 +545,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID",
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "40305 PERMISSION_DENIED",
+                        "description": "403005 PERMISSION_DENIED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -600,19 +600,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED",
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "40901 CONFLICT (team_code taken)",
+                        "description": "409001 CONFLICT (team_code taken)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -625,7 +625,7 @@ const docTemplate = `{
                         "CSRFToken": []
                     }
                 ],
-                "description": "Best effort, in one statement: every live team in ` + "`" + `ids` + "`" + ` is soft-deleted and its active roster closed, as DELETE /teams/{id} does. A team that cannot be deleted is listed in ` + "`" + `failed` + "`" + ` with the code and message the single delete returns (40401 missing or already deleted); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.",
+                "description": "Best effort, in one statement: every live team in ` + "`" + `ids` + "`" + ` is soft-deleted and its active roster closed, as DELETE /teams/{id} does. A team that cannot be deleted is listed in ` + "`" + `failed` + "`" + ` with the code and message the single delete returns (404001 missing or already deleted); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.",
                 "consumes": [
                     "application/json"
                 ],
@@ -655,13 +655,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)",
+                        "description": "400001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED",
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -743,13 +743,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND (team has not entered the division)",
+                        "description": "404001 NOT_FOUND (team has not entered the division)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -806,25 +806,25 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "40305 PERMISSION_DENIED (not the team captain, or an unpaid member)",
+                        "description": "403005 PERMISSION_DENIED (not the team captain, or an unpaid member)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND (player, or team has not entered the division)",
+                        "description": "404001 NOT_FOUND (player, or team has not entered the division)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "40901 CONFLICT (already on a roster in the division)",
+                        "description": "409001 CONFLICT (already on a roster in the division)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -875,25 +875,25 @@ const docTemplate = `{
                         "description": "removed"
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "40305 PERMISSION_DENIED (not the team captain, or an unpaid member)",
+                        "description": "403005 PERMISSION_DENIED (not the team captain, or an unpaid member)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND (team or roster entry)",
+                        "description": "404001 NOT_FOUND (team or roster entry)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "40901 CONFLICT (captain)",
+                        "description": "409001 CONFLICT (captain)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -957,25 +957,25 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "40305 PERMISSION_DENIED (not the team captain, or an unpaid member)",
+                        "description": "403005 PERMISSION_DENIED (not the team captain, or an unpaid member)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND (team, roster entry, or target team has not entered the division)",
+                        "description": "404001 NOT_FOUND (team, roster entry, or target team has not entered the division)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "40901 CONFLICT (captain, or already on a roster in the target division)",
+                        "description": "409001 CONFLICT (captain, or already on a roster in the target division)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -990,7 +990,7 @@ const docTemplate = `{
                         "CSRFToken": []
                     }
                 ],
-                "description": "Best effort, in one transaction: every team in ` + "`" + `ids` + "`" + ` that is soft-deleted and has no fixture is removed, as DELETE /teams/{id}/permanent does. A team that cannot be deleted is listed in ` + "`" + `failed` + "`" + ` (40401 missing, 40901 not deleted yet or has fixtures); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.",
+                "description": "Best effort, in one transaction: every team in ` + "`" + `ids` + "`" + ` that is soft-deleted and has no fixture is removed, as DELETE /teams/{id}/permanent does. A team that cannot be deleted is listed in ` + "`" + `failed` + "`" + ` (404001 missing, 409001 not deleted yet or has fixtures); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1020,13 +1020,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)",
+                        "description": "400001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED",
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -1060,13 +1060,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND",
+                        "description": "404001 NOT_FOUND",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -1101,7 +1101,7 @@ const docTemplate = `{
                         "description": "deleted"
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND",
+                        "description": "404001 NOT_FOUND",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -1151,19 +1151,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND",
+                        "description": "404001 NOT_FOUND",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "40901 CONFLICT (team_code taken)",
+                        "description": "409001 CONFLICT (team_code taken)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -1215,19 +1215,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND",
+                        "description": "404001 NOT_FOUND",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "40901 CONFLICT (already entered)",
+                        "description": "409001 CONFLICT (already entered)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -1271,19 +1271,19 @@ const docTemplate = `{
                         "description": "withdrawn"
                     },
                     "400": {
-                        "description": "40001 VALIDATION_FAILED",
+                        "description": "400001 VALIDATION_FAILED",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND",
+                        "description": "404001 NOT_FOUND",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "40901 CONFLICT (team has matches)",
+                        "description": "409001 CONFLICT (team has matches)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -1320,13 +1320,13 @@ const docTemplate = `{
                         "description": "permanently deleted"
                     },
                     "404": {
-                        "description": "40401 NOT_FOUND",
+                        "description": "404001 NOT_FOUND",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "40901 CONFLICT (not deleted yet, or team has matches)",
+                        "description": "409001 CONFLICT (not deleted yet, or team has matches)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -1389,7 +1389,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorCode"
                         }
                     ],
-                    "example": "40401"
+                    "example": 404001
                 },
                 "message": {
                     "type": "string",
@@ -1398,38 +1398,31 @@ const docTemplate = `{
             }
         },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorCode": {
-            "type": "string",
+            "type": "integer",
+            "format": "int64",
             "enum": [
-                "40001",
-                "40101",
-                "40102",
-                "40103",
-                "40104",
-                "40301",
-                "40302",
-                "40304",
-                "40305",
-                "40401",
-                "40901",
-                "42901",
-                "50001",
-                "50201"
+                400001,
+                401001,
+                401002,
+                401003,
+                403001,
+                403002,
+                403005,
+                404001,
+                409001,
+                500001
             ],
             "x-enum-varnames": [
                 "CodeValidationFailed",
                 "CodeNoSession",
                 "CodeSessionInvalid",
                 "CodeNoUserInContext",
-                "CodeUnauthenticated",
                 "CodeCSRFCookieMissing",
                 "CodeCSRFTokenMismatch",
-                "CodeForbidden",
                 "CodePermissionDenied",
                 "CodeNotFound",
                 "CodeConflict",
-                "CodeRateLimited",
-                "CodeInternal",
-                "CodeUpstream"
+                "CodeInternal"
             ]
         },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse": {
@@ -1784,7 +1777,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorCode"
                         }
                     ],
-                    "example": "40401"
+                    "example": 404001
                 },
                 "id": {
                     "type": "string"

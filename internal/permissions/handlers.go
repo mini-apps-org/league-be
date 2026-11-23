@@ -21,8 +21,8 @@ func NewHandler(cfg *config.Config, service Service) Handler {
 // @Tags			permissions
 // @Produce		json
 // @Success		200	{object}	handler.SuccessResponse[[]permissions.PermissionResponse]
-// @Failure		401	{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID"
-// @Failure		403	{object}	handler.ErrorResponse	"40305 PERMISSION_DENIED"
+// @Failure		401	{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
+// @Failure		403	{object}	handler.ErrorResponse	"403005 PERMISSION_DENIED"
 // @Router			/permissions [get]
 func (h *Handler) ListPermissions(w http.ResponseWriter, r *http.Request) {
 	permissions, err := h.service.ListPermissions(r.Context())
@@ -47,8 +47,8 @@ func (h *Handler) ListPermissions(w http.ResponseWriter, r *http.Request) {
 // @Produce	json
 // @Param		id	path		string	true	"permission id (uuid)"
 // @Success	200	{object}	handler.SuccessResponse[permissions.PermissionResponse]
-// @Failure	400	{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure	404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
+// @Failure	400	{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure	404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
 // @Router		/permissions/{id} [get]
 func (h *Handler) GetPermissionByID(w http.ResponseWriter, r *http.Request) {
 	id, err := handler.ParsePathUUID(r, "id")

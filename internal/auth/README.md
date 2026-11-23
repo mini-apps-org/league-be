@@ -114,7 +114,7 @@ sequenceDiagram
         A->>D: UPDATE last_seen_at (extends the idle window)
         A-->>F: 200 user JSON
     else expired or unknown
-        A-->>F: 401 40102 SESSION_INVALID + clears the dead cookie
+        A-->>F: 401 401002 SESSION_INVALID + clears the dead cookie
     end
 
     F->>A: POST /api/v1/auth/logout (sid + X-CSRF-Token)
@@ -132,26 +132,26 @@ Everything is mounted under `PrefixAPIV1` = `/api/v1` (`internal/platform/router
 |---|---|---|---|---|---|
 | GET | `/api/v1/auth/google/login` | – | – | 302 to Google, sets `oauth_tx` | 302 `{frontend}/login?error=server_error` |
 | GET | `/api/v1/auth/google/callback` | `oauth_tx` cookie | `code`, `state` (from Google) | 302 frontend root, or `/onboarding` on sign-up; sets `sid` + `csrf` | 302 `…/login?error=cancelled\|login_failed\|server_error` |
-| POST | `/api/v1/auth/logout` | `sid` + CSRF | – | 204, cookies cleared | 403 `40301`/`40302`, 500 `50001` |
-| GET | `/api/v1/me` | `sid` | – | 200 `{data:{user:{id,email,name,avatarUrl}}}` | 401 `40101`/`40102`/`40103` |
+| POST | `/api/v1/auth/logout` | `sid` + CSRF | – | 204, cookies cleared | 403 `403001`/`403002`, 500 `500001` |
+| GET | `/api/v1/me` | `sid` | – | 200 `{data:{user:{id,email,name,avatarUrl}}}` | 401 `401001`/`401002`/`401003` |
 
 Errors use the shared envelope from `internal/platform/handler/error.go`:
-`{"error":{"code":"40102","message":"Your session has expired. Please sign in again."}}`. Success
+`{"error":{"code":401002,"message":"Your session has expired. Please sign in again."}}`. Success
 responses are wrapped in `handler.SuccessResponse` (`data`, plus `metadata` on lists). The
 session id is never in a body: `sid` is `HttpOnly` so page scripts cannot read it.
 
-**Codes are 5-digit strings**, not slugs: the first three digits are the HTTP status, the last two
-the case within it. The frontend switches on the string, so a code may be added but never reassigned.
+**Codes are 6-digit numbers**, not slugs: the first three digits are the HTTP status, the last three
+the case within it. The frontend switches on the number, so a code may be added but never reassigned.
 The ones this package serves:
 
 | Code | Reason (logs + docs) | Meaning |
 |---|---|---|
-| `40101` | `SESSION_COOKIE_ABSENT` | no `sid` cookie on the request |
-| `40102` | `SESSION_INVALID` | `sid` present but `GetSessionUserID` refused it |
-| `40103` | `USER_NOT_IN_CONTEXT` | handler ran without `middleware.RequireSession` populating the context |
-| `40301` | `CSRF_COOKIE_ABSENT` | unsafe method with no `csrf` cookie |
-| `40302` | `CSRF_TOKEN_MISMATCH` | header and cookie disagree |
-| `50001` | `INTERNAL` | anything unclassified, including a failed logout |
+| `401001` | `SESSION_COOKIE_ABSENT` | no `sid` cookie on the request |
+| `401002` | `SESSION_INVALID` | `sid` present but `GetSessionUserID` refused it |
+| `401003` | `USER_NOT_IN_CONTEXT` | handler ran without `middleware.RequireSession` populating the context |
+| `403001` | `CSRF_COOKIE_ABSENT` | unsafe method with no `csrf` cookie |
+| `403002` | `CSRF_TOKEN_MISMATCH` | header and cookie disagree |
+| `500001` | `INTERNAL` | anything unclassified, including a failed logout |
 
 The `reason` slug is developer-facing — it goes to the log line and the Swagger annotations, never
 into a response body. The `message` is the browser-facing text and must never name an internal cause.
@@ -332,14 +332,14 @@ re-introducing it with a backfill from `google_sub`.
 | State mismatch | 302 `/login?error=login_failed` (`ErrLoginRejected`), before contacting Google |
 | Exchange failure, bad `id_token`, nonce missing or mismatched, no `sub`, `email_verified=false` | 302 `/login?error=login_failed` |
 | DB error, or a failed CSRF token mint, during the callback | 302 `/login?error=server_error` |
-| Missing `sid` | 401 `40101 SESSION_COOKIE_ABSENT` |
-| Unknown or expired `sid` | 401 `40102 SESSION_INVALID`, dead cookie cleared |
-| Missing or mismatched CSRF token | 403 `40301` / `40302` |
-| Logout fails in the database | 500 `50001 INTERNAL`, cookies left in place |
+| Missing `sid` | 401 `401001 SESSION_COOKIE_ABSENT` |
+| Unknown or expired `sid` | 401 `401002 SESSION_INVALID`, dead cookie cleared |
+| Missing or mismatched CSRF token | 403 `403001` / `403002` |
+| Logout fails in the database | 500 `500001 INTERNAL`, cookies left in place |
 
 `ErrLoginRejected` is the single sentinel for every unacceptable Google round trip, which is what
 lets `CallbackLogin` separate "their fault" (`login_failed`) from "our fault" (`server_error`) with
-one `errors.Is`. Anything that is not an `*APIError` is served as `50001`, so an unclassified failure
+one `errors.Is`. Anything that is not an `*APIError` is served as `500001`, so an unclassified failure
 cannot leak its text. Every handler in this package sets `Cache-Control: no-store` on its own
 responses, including the failure redirects; `middleware.RequireSession`'s 401s do not, because they are
 served straight through `ReturnWithError`.
@@ -363,7 +363,7 @@ cause — deliberately not the user-facing message and nothing from the request 
 5. On every unsafe request, read the `csrf` cookie and send it as `X-CSRF-Token`. In production the
    cookie is named `__Secure-csrf`.
 6. Page `/login` shows a message for `error=cancelled`, `login_failed`, `server_error`.
-7. On a 401 (`40101`, `40102`, `40103`), drop client state and route to `/login` — there is no
+7. On a 401 (`401001`, `401002`, `401003`), drop client state and route to `/login` — there is no
    refresh step to attempt.
 8. Logout: `POST /api/v1/auth/logout` with the CSRF header; the server clears both cookies.
 
@@ -464,7 +464,7 @@ stays in Testing with team accounts as test users, no logo during the MVP.
 - **Neither this design nor the table it replaced resists cookie-forcing.** An attacker who can set
   the victim's `oauth_tx` can complete a login as *their own* Google account in the victim's browser
   (login CSRF). Prefixed cookies and HTTPS are what prevent the delivery; no payload format helps.
-- **`middleware.RequireSession` collapses every `GetSessionUserID` failure into `40102`** and clears the cookie, so a
+- **`middleware.RequireSession` collapses every `GetSessionUserID` failure into `401002`** and clears the cookie, so a
   database outage signs users out and reads to the SPA as an expired session. The sentinels needed to
   tell those apart (`ErrNoSession`, `ErrNoUser`) already exist — map them when it matters.
 - **A session read costs a query per authenticated request.** That read is exactly what makes logout

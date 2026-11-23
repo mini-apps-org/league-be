@@ -13,7 +13,7 @@ func errorCode(err error) handler.ErrorCode {
 	if errors.As(err, &apiErr) {
 		return apiErr.Code
 	}
-	return ""
+	return 0
 }
 
 // A cursor's LastValue belongs to the column it was sorted by. Reused under another sort,
@@ -32,8 +32,8 @@ func TestCursorParamsNormalise(t *testing.T) {
 		wantLimit int
 		wantAfter bool
 	}{
-		{"first page gets the default limit", CursorParams{}, byName, "", DefaultLimit, false},
-		{"cursor for the same sort", CursorParams{Cursor: cursorByName}, byName, "", DefaultLimit, true},
+		{"first page gets the default limit", CursorParams{}, byName, 0, DefaultLimit, false},
+		{"cursor for the same sort", CursorParams{Cursor: cursorByName}, byName, 0, DefaultLimit, true},
 		{"cursor for another direction", CursorParams{Cursor: cursorByName}, byNameDesc, handler.CodeValidationFailed, 0, false},
 		{"not base64", CursorParams{Cursor: "%%%"}, byName, handler.CodeValidationFailed, 0, false},
 		{"wrong prefix", CursorParams{Cursor: base64.RawURLEncoding.EncodeToString([]byte(`p1:{"s":"name"}`))}, byName, handler.CodeValidationFailed, 0, false},
@@ -47,9 +47,9 @@ func TestCursorParamsNormalise(t *testing.T) {
 			err := params.Normalise(tt.sort)
 
 			if got := errorCode(err); got != tt.wantCode {
-				t.Fatalf("error code = %q, want %q (err: %v)", got, tt.wantCode, err)
+				t.Fatalf("error code = %d, want %d (err: %v)", got, tt.wantCode, err)
 			}
-			if tt.wantCode != "" {
+			if tt.wantCode != 0 {
 				return
 			}
 			if params.Limit != tt.wantLimit {
@@ -94,10 +94,10 @@ func TestParseLimit(t *testing.T) {
 		want     int
 		wantCode handler.ErrorCode
 	}{
-		{"", 0, ""}, // Normalise applies DefaultLimit
-		{"5", 5, ""},
-		{" 25 ", 25, ""},
-		{"200", 200, ""},
+		{"", 0, 0}, // Normalise applies DefaultLimit
+		{"5", 5, 0},
+		{" 25 ", 25, 0},
+		{"200", 200, 0},
 		{"0", 0, handler.CodeValidationFailed},
 		{"-1", 0, handler.CodeValidationFailed},
 		{"201", 0, handler.CodeValidationFailed},
@@ -109,7 +109,7 @@ func TestParseLimit(t *testing.T) {
 		t.Run(tt.raw, func(t *testing.T) {
 			got, err := ParseLimit(tt.raw)
 			if code := errorCode(err); code != tt.wantCode {
-				t.Fatalf("error code = %q, want %q (err: %v)", code, tt.wantCode, err)
+				t.Fatalf("error code = %d, want %d (err: %v)", code, tt.wantCode, err)
 			}
 			if got != tt.want {
 				t.Errorf("ParseLimit(%q) = %d, want %d", tt.raw, got, tt.want)

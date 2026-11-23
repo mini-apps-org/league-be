@@ -20,8 +20,8 @@ func NewHandler(cfg *config.Config, service Service) Handler {
 // @Tags		roles
 // @Produce	json
 // @Success	200	{object}	handler.SuccessResponse[[]roles.RoleResponse]
-// @Failure	401	{object}	handler.ErrorResponse	"40101 SESSION_COOKIE_ABSENT | 40102 SESSION_INVALID"
-// @Failure	403	{object}	handler.ErrorResponse	"40305 PERMISSION_DENIED"
+// @Failure	401	{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
+// @Failure	403	{object}	handler.ErrorResponse	"403005 PERMISSION_DENIED"
 // @Router		/roles [get]
 func (h *Handler) ListRoles(w http.ResponseWriter, r *http.Request) {
 	roles, err := h.service.ListRoles(r.Context())
@@ -48,9 +48,9 @@ func (h *Handler) ListRoles(w http.ResponseWriter, r *http.Request) {
 // @Produce		json
 // @Param			body	body		roles.CreateRoleRequest	true	"role to create"
 // @Success		201		{object}	handler.SuccessResponse[roles.RoleResponse]
-// @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure		403		{object}	handler.ErrorResponse	"40301 CSRF_COOKIE_ABSENT | 40302 CSRF_TOKEN_MISMATCH | 40305 PERMISSION_DENIED"
-// @Failure		409		{object}	handler.ErrorResponse	"40901 CONFLICT"
+// @Failure		400		{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure		403		{object}	handler.ErrorResponse	"403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED"
+// @Failure		409		{object}	handler.ErrorResponse	"409001 CONFLICT"
 // @Security		CSRFToken
 // @Router			/roles [post]
 func (h *Handler) CreateRole(w http.ResponseWriter, r *http.Request) {
@@ -78,8 +78,8 @@ func (h *Handler) CreateRole(w http.ResponseWriter, r *http.Request) {
 // @Produce	json
 // @Param		id	path		string	true	"role id (uuid)"
 // @Success	200	{object}	handler.SuccessResponse[roles.RoleResponse]
-// @Failure	400	{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure	404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
+// @Failure	400	{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure	404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
 // @Router		/roles/{id} [get]
 func (h *Handler) GetRole(w http.ResponseWriter, r *http.Request) {
 	id, err := handler.ParsePathUUID(r, "id")
@@ -105,8 +105,8 @@ func (h *Handler) GetRole(w http.ResponseWriter, r *http.Request) {
 // @Param			id		path		string					true	"role id (uuid)"
 // @Param			body	body		roles.UpdateRoleRequest	true	"fields to change"
 // @Success		200		{object}	handler.SuccessResponse[roles.RoleResponse]
-// @Failure		400		{object}	handler.ErrorResponse	"40001 VALIDATION_FAILED"
-// @Failure		404		{object}	handler.ErrorResponse	"40401 NOT_FOUND"
+// @Failure		400		{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure		404		{object}	handler.ErrorResponse	"404001 NOT_FOUND"
 // @Security		CSRFToken
 // @Router			/roles/{id} [patch]
 func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
@@ -140,8 +140,8 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 // @Produce		json
 // @Param			id	path	string	true	"role id (uuid)"
 // @Success		204	"deleted"
-// @Failure		404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
-// @Failure		409	{object}	handler.ErrorResponse	"40901 CONFLICT (SUPER_ADMIN)"
+// @Failure		404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
+// @Failure		409	{object}	handler.ErrorResponse	"409001 CONFLICT (SUPER_ADMIN)"
 // @Security		CSRFToken
 // @Router			/roles/{id} [delete]
 func (h *Handler) DeleteRole(w http.ResponseWriter, r *http.Request) {
@@ -165,8 +165,8 @@ func (h *Handler) DeleteRole(w http.ResponseWriter, r *http.Request) {
 // @Produce		json
 // @Param			id	path	string	true	"role id (uuid)"
 // @Success		204	"permanently deleted"
-// @Failure		404	{object}	handler.ErrorResponse	"40401 NOT_FOUND"
-// @Failure		409	{object}	handler.ErrorResponse	"40901 CONFLICT (not deleted yet)"
+// @Failure		404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
+// @Failure		409	{object}	handler.ErrorResponse	"409001 CONFLICT (not deleted yet)"
 // @Security		CSRFToken
 // @Router			/roles/{id}/permanent [delete]
 func (h *Handler) PermanentDeleteRole(w http.ResponseWriter, r *http.Request) {

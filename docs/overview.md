@@ -57,10 +57,10 @@ flowchart TD
     perm --> handler
     handler --> pg[("PostgreSQL")]
 
-    csrf -. "403 40301 no cookie / 40302 mismatch" .-> err["Error envelope<br/>{ error: { code, message } }"]
-    session -. "401 40101 no cookie / 40102 expired" .-> err
-    session2 -. "401 40101 / 40102" .-> err
-    perm -. "403 40305 permission denied" .-> err
+    csrf -. "403 403001 no cookie / 403002 mismatch" .-> err["Error envelope<br/>{ error: { code, message } }"]
+    session -. "401 401001 no cookie / 401002 expired" .-> err
+    session2 -. "401 401001 / 401002" .-> err
+    perm -. "403 403005 permission denied" .-> err
 ```
 
 `RequirePermission` maps the method to an action (`GET` → read, `POST` → create, …),

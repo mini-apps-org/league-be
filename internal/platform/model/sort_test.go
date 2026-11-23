@@ -18,11 +18,11 @@ func TestParseSort(t *testing.T) {
 		want     SortParams
 		wantCode handler.ErrorCode
 	}{
-		{"", SortParams{Field: "name"}, ""},
-		{"   ", SortParams{Field: "name"}, ""},
-		{"created_at", SortParams{Field: "created_at"}, ""},
-		{"-created_at", SortParams{Field: "created_at", Desc: true}, ""},
-		{" -name ", SortParams{Field: "name", Desc: true}, ""},
+		{"", SortParams{Field: "name"}, 0},
+		{"   ", SortParams{Field: "name"}, 0},
+		{"created_at", SortParams{Field: "created_at"}, 0},
+		{"-created_at", SortParams{Field: "created_at", Desc: true}, 0},
+		{" -name ", SortParams{Field: "name", Desc: true}, 0},
 		{"--name", SortParams{}, handler.CodeValidationFailed},
 		{"+name", SortParams{}, handler.CodeValidationFailed},
 		{"Name", SortParams{}, handler.CodeValidationFailed},
@@ -40,7 +40,7 @@ func TestParseSort(t *testing.T) {
 				gotCode = apiErr.Code
 			}
 			if gotCode != tt.wantCode {
-				t.Fatalf("error code = %q, want %q (err: %v)", gotCode, tt.wantCode, err)
+				t.Fatalf("error code = %d, want %d (err: %v)", gotCode, tt.wantCode, err)
 			}
 			if got != tt.want {
 				t.Errorf("ParseSort(%q) = %+v, want %+v", tt.raw, got, tt.want)

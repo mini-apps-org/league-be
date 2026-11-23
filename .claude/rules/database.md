@@ -200,16 +200,14 @@ func (r *repository) GetUserByID(ctx context.Context, id string) (*User, error) 
 }
 ```
 
-The service then maps the sentinel to an error code — that mapping is the service's job,
-never the repository's:
+Declare the sentinel in the feature's `internal/<feature>/errors.go`, with a row in that
+package's `[]handler.ErrorMapping` table giving its code and message — never in
+`platform`, which must not know a feature. The service then maps it — that mapping is the
+service's job, never the repository's:
 
 ```go
-func asAPIError(err error) error {
-	if errors.Is(err, ErrNoUser) {
-		return handler.Error(handler.CodeNotFound, err)
-	}
-	return err
-}
+	role, err := s.repo.GetRoleByID(ctx, id)
+	return role, handler.MapFeatureError(err, roleErrorMappings)
 ```
 
 For writes, check `tag.RowsAffected() == 0` rather than expecting an error — an `UPDATE`

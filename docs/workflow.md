@@ -41,20 +41,23 @@ attributes are one concern and one concern gets one file.
 ## 2. Errors
 
 - Every error gets wrapped with package and operation: `fmt.Errorf("auth: complete login: %w", err)`.
-- A repository returns its **own sentinel** (`ErrNoUser`), never `pgx.ErrNoRows`.
-- The **service** maps a sentinel to an API error: `handler.Error(handler.CodeNotFound, err)`.
+- A repository returns its **own sentinel** (`ErrTeamNotFound`), never `pgx.ErrNoRows`.
+  Each feature declares its sentinels, and the code and message each is served with, in
+  `internal/<feature>/errors.go` as a `[]handler.ErrorMapping` table.
+- The **service** maps a sentinel to an API error with its package's table:
+  `handler.MapFeatureError(err, roleErrorMappings)`. A sentinel missing from the table is
+  served as `500001`.
 - The **handler** calls `h.ReturnWithError(w, r, err)` and nothing else. Anything that is
-  not an `*APIError` is served as `50001`, so an unclassified failure cannot leak its text.
+  not an `*APIError` is served as `500001`, so an unclassified failure cannot leak its text.
 
 Error codes live in one registry: `internal/platform/handler/error.go`. The code is
-5 digits — HTTP status, then the case within that status. To add one:
+6 digits — HTTP status, then a 3-digit case within that status. To add one:
 
 1. Add the `const` under its status block, taking the next free number.
 2. Add its `errorDetails` entry: a stable `reason` slug for logs, a `message` safe for a browser.
 3. Name it in the handler's swagger `@Failure` line.
 
-**Never renumber or reassign a shipped code** — the frontend switches on the string.
-Retired codes (`40002`, `40303`) stay retired and are marked as such in the file.
+**Never renumber or reassign a shipped code** — the frontend switches on the number.
 
 ---
 

@@ -120,7 +120,7 @@ Outside production the names are bare. In production they are `__Host-sid` and
 `__Secure-csrf`, and `Secure`.
 
 **One session per user.** Signing in again anywhere replaces the session — the old `sid`
-then answers `40102`. The session also ends after `SESSION_IDLE_TTL` (30 min) without a
+then answers `401002`. The session also ends after `SESSION_IDLE_TTL` (30 min) without a
 request, or `SESSION_TTL` (12 h) in total.
 
 ---
@@ -245,20 +245,20 @@ The full list, with every parameter and error, is the Swagger UI.
 
 ## 10. When a request fails
 
-Every error has the same body — `{"error": {"code": "40102", "message": "…"}}` — and the
+Every error has the same body — `{"error": {"code": 401002, "message": "…"}}` — and the
 server log line carries the cause under the same `request_id`.
 
 | Code | Meaning | Fix |
 |---|---|---|
-| `40001` | a parameter or body field is invalid | the message names the field |
-| `40101` | no `sid` cookie | check the `Cookie` header / pre-request script |
-| `40102` | session expired or replaced | sign in again, copy the new cookies |
-| `40301` | no `csrf` cookie on a write | send the `csrf` cookie too |
-| `40302` | `X-CSRF-Token` differs from the `csrf` cookie | both must hold the same value |
-| `40305` | your role lacks the permission | step 6 |
-| `40401` | the id does not exist, or the row is soft-deleted | |
-| `40901` | conflicts with existing data (duplicate team code, team has fixtures, …) | the message says which |
-| `50001` | unexpected server error | read the server log for that `request_id` |
+| `400001` | a parameter or body field is invalid | the message names the field |
+| `401001` | no `sid` cookie | check the `Cookie` header / pre-request script |
+| `401002` | session expired or replaced | sign in again, copy the new cookies |
+| `403001` | no `csrf` cookie on a write | send the `csrf` cookie too |
+| `403002` | `X-CSRF-Token` differs from the `csrf` cookie | both must hold the same value |
+| `403005` | your role lacks the permission | step 6 |
+| `404001` | the id does not exist, or the row is soft-deleted | |
+| `409001` | conflicts with existing data (duplicate team code, team has fixtures, …) | the message says which |
+| `500001` | unexpected server error | read the server log for that `request_id` |
 
 | Symptom | Cause |
 |---|---|

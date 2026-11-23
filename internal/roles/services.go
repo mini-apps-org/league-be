@@ -2,7 +2,6 @@ package roles
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -50,12 +49,12 @@ func (s *service) CreateRole(ctx context.Context, params CreateRoleServiceParams
 	}
 
 	role, err := s.repo.CreateRole(ctx, params)
-	return role, asAPIError(err)
+	return role, handler.MapFeatureError(err, roleErrorMappings)
 }
 
 func (s *service) GetRole(ctx context.Context, id string) (*Role, error) {
 	role, err := s.repo.GetRoleByID(ctx, id)
-	return role, asAPIError(err)
+	return role, handler.MapFeatureError(err, roleErrorMappings)
 }
 
 func (s *service) ListRoles(ctx context.Context) ([]Role, error) {
@@ -75,25 +74,25 @@ func (s *service) UpdateRole(ctx context.Context, id string, params UpdateRoleSe
 	}
 
 	role, err := s.repo.UpdateRole(ctx, id, params)
-	return role, asAPIError(err)
+	return role, handler.MapFeatureError(err, roleErrorMappings)
 }
 
 func (s *service) DeleteRole(ctx context.Context, id string) error {
 	role, err := s.repo.GetRoleByID(ctx, id)
 	if err != nil {
-		return asAPIError(err)
+		return handler.MapFeatureError(err, roleErrorMappings)
 	}
 	if role.Code == CodeSuperAdmin {
 		return superAdminProtectedError()
 	}
 
-	return asAPIError(s.repo.SoftDeleteRole(ctx, id))
+	return handler.MapFeatureError(s.repo.SoftDeleteRole(ctx, id), roleErrorMappings)
 }
 
 // PermanentDeleteRole needs no SUPER_ADMIN check: DeleteRole refuses to soft-delete it, and
 // only a soft-deleted role can be removed.
 func (s *service) PermanentDeleteRole(ctx context.Context, id string) error {
-	return asAPIError(s.repo.PermanentDeleteRole(ctx, id))
+	return handler.MapFeatureError(s.repo.PermanentDeleteRole(ctx, id), roleErrorMappings)
 }
 
 // validateRoleFields checks the supplied (non-nil) fields. Lengths count runes, not
@@ -120,19 +119,4 @@ func newValidationError(message string) error {
 func superAdminProtectedError() error {
 	return handler.ErrorWithMessage(handler.CodeConflict,
 		"SUPER_ADMIN grants every permission and is managed by migration, not over HTTP", nil)
-}
-
-func asAPIError(err error) error {
-	switch {
-	case err == nil:
-		return nil
-	case errors.Is(err, ErrRoleNotFound):
-		return handler.Error(handler.CodeNotFound, err)
-	case errors.Is(err, ErrRoleNotSoftDeleted):
-		return handler.ErrorWithMessage(handler.CodeConflict, "delete the role before deleting it permanently", err)
-	case errors.Is(err, ErrDuplicateRoleCode):
-		return handler.ErrorWithMessage(handler.CodeConflict, "a role with that code already exists", err)
-	default:
-		return err
-	}
 }
