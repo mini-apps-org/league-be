@@ -626,7 +626,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "409001 CONFLICT (duplicate name)",
+                        "description": "409001 CONFLICT (duplicate name, or another session made active at the same time)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -691,7 +691,7 @@ const docTemplate = `{
                         "CSRFToken": []
                     }
                 ],
-                "description": "Hard delete. Cascades to the session's divisions, teams and matches, including submitted results. Cannot be undone.",
+                "description": "Hard delete. Cascades to the session's divisions, the teams created in them, and their matches, including submitted results. Cannot be undone. Refused with 409 while a team created in this session also plays in another session, since the cascade would remove it from that session too.",
                 "produces": [
                     "application/json"
                 ],
@@ -732,6 +732,12 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "404001 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "409001 CONFLICT (a team created here plays in another session)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -805,7 +811,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "409001 CONFLICT (duplicate name)",
+                        "description": "409001 CONFLICT (duplicate name, or another session made active at the same time)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }

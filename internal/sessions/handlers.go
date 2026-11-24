@@ -2,14 +2,22 @@ package sessions
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
+	"github.com/nguyentanvinh/league-be/internal/platform/config"
 	"github.com/nguyentanvinh/league-be/internal/platform/handler"
+	"github.com/nguyentanvinh/league-be/internal/platform/model"
 )
 
-// Handler is the swagger contract for /sessions. The method bodies are filled in with the
-// service; until then the handlers are not registered in the router.
 type Handler struct {
 	handler.Handler
+	service Service
+}
+
+func NewHandler(cfg *config.Config, service Service) Handler {
+	return Handler{Handler: handler.Handler{Config: cfg}, service: service}
 }
 
 // @Summary		List league sessions
@@ -26,7 +34,42 @@ type Handler struct {
 // @Failure		401				{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
 // @Failure		403				{object}	handler.ErrorResponse	"403005 PERMISSION_DENIED"
 // @Router			/sessions [get]
-func (h *Handler) ListLeagueSessions(w http.ResponseWriter, r *http.Request) {}
+func (h *Handler) ListLeagueSessions(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	sort, err := parseLeagueSessionSort(query.Get("sort"))
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+	seasonYear, err := parseOptionalSeasonYear(query.Get("season_year"))
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	sessions, err := h.service.ListLeagueSessions(r.Context(), ListLeagueSessionsServiceParams{
+		Query:       query.Get("q"),
+		SessionType: LeagueSessionType(query.Get("session_type")),
+		SeasonYear:  seasonYear,
+		Status:      LeagueSessionStatus(query.Get("status")),
+		Sort:        sort,
+	})
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	items := make([]LeagueSessionResponse, 0, len(sessions))
+	for _, session := range sessions {
+		items = append(items, newLeagueSessionResponse(session))
+	}
+
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]LeagueSessionResponse]{
+		Data:     items,
+		Metadata: handler.NewMetadata(len(items)),
+	})
+}
 
 // @Summary	Get a league session
 // @Tags		sessions
@@ -38,7 +81,21 @@ func (h *Handler) ListLeagueSessions(w http.ResponseWriter, r *http.Request) {}
 // @Failure	403	{object}	handler.ErrorResponse	"403005 PERMISSION_DENIED"
 // @Failure	404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
 // @Router		/sessions/{id} [get]
-func (h *Handler) GetLeagueSession(w http.ResponseWriter, r *http.Request) {}
+func (h *Handler) GetLeagueSession(w http.ResponseWriter, r *http.Request) {
+	id, err := handler.ParsePathUUID(r, "id")
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	session, err := h.service.GetLeagueSessionByID(r.Context(), id)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[LeagueSessionResponse]{Data: newLeagueSessionResponse(*session)})
+}
 
 // @Summary		Create a league session
 // @Description	`name` is trimmed and must be 3–60 characters, unique within the league. `season_year` is 2000–2100. `ends_on` must be on or after `starts_on`. A missing `status` becomes DRAFT. `is_active: true` deactivates the league's other sessions.
@@ -50,10 +107,49 @@ func (h *Handler) GetLeagueSession(w http.ResponseWriter, r *http.Request) {}
 // @Failure		400		{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
 // @Failure		401		{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
 // @Failure		403		{object}	handler.ErrorResponse	"403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED"
-// @Failure		409		{object}	handler.ErrorResponse	"409001 CONFLICT (duplicate name)"
+// @Failure		409		{object}	handler.ErrorResponse	"409001 CONFLICT (duplicate name, or another session made active at the same time)"
 // @Security		CSRFToken
 // @Router			/sessions [post]
-func (h *Handler) CreateLeagueSession(w http.ResponseWriter, r *http.Request) {}
+func (h *Handler) CreateLeagueSession(w http.ResponseWriter, r *http.Request) {
+	var body CreateLeagueSessionRequest
+	if err := h.DecodeJSON(w, r, &body); err != nil {
+		h.ReturnWithError(w, r, handler.InvalidJSONBodyError(err))
+		return
+	}
+
+	startsOn, err := parseLeagueSessionDate("starts_on", body.StartsOn)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+	endsOn, err := parseLeagueSessionDate("ends_on", body.EndsOn)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	params := CreateLeagueSessionServiceParams{
+		Name:        body.Name,
+		SessionType: LeagueSessionType(body.SessionType),
+		SeasonYear:  body.SeasonYear,
+		StartsOn:    startsOn,
+		EndsOn:      endsOn,
+	}
+	if body.Status != nil {
+		params.Status = LeagueSessionStatus(*body.Status)
+	}
+	if body.IsActive != nil {
+		params.IsActive = *body.IsActive
+	}
+
+	session, err := h.service.CreateLeagueSession(r.Context(), params)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	h.ReturnWithJSON(w, http.StatusCreated, handler.SuccessResponse[LeagueSessionResponse]{Data: newLeagueSessionResponse(*session)})
+}
 
 // @Summary		Update a league session
 // @Description	Partial update: an absent field is left unchanged, and an empty body is rejected. The create rules apply to the merged result, so moving only `ends_on` before the existing `starts_on` fails. `is_active: true` deactivates the league's other sessions.
@@ -67,13 +163,52 @@ func (h *Handler) CreateLeagueSession(w http.ResponseWriter, r *http.Request) {}
 // @Failure		401		{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
 // @Failure		403		{object}	handler.ErrorResponse	"403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED"
 // @Failure		404		{object}	handler.ErrorResponse	"404001 NOT_FOUND"
-// @Failure		409		{object}	handler.ErrorResponse	"409001 CONFLICT (duplicate name)"
+// @Failure		409		{object}	handler.ErrorResponse	"409001 CONFLICT (duplicate name, or another session made active at the same time)"
 // @Security		CSRFToken
 // @Router			/sessions/{id} [patch]
-func (h *Handler) UpdateLeagueSession(w http.ResponseWriter, r *http.Request) {}
+func (h *Handler) UpdateLeagueSession(w http.ResponseWriter, r *http.Request) {
+	id, err := handler.ParsePathUUID(r, "id")
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	var body UpdateLeagueSessionRequest
+	if err := h.DecodeJSON(w, r, &body); err != nil {
+		h.ReturnWithError(w, r, handler.InvalidJSONBodyError(err))
+		return
+	}
+
+	startsOn, err := parseOptionalLeagueSessionDate("starts_on", body.StartsOn)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+	endsOn, err := parseOptionalLeagueSessionDate("ends_on", body.EndsOn)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	session, err := h.service.UpdateLeagueSession(r.Context(), id, UpdateLeagueSessionServiceParams{
+		Name:        body.Name,
+		SessionType: optionalNamedString[LeagueSessionType](body.SessionType),
+		SeasonYear:  body.SeasonYear,
+		StartsOn:    startsOn,
+		EndsOn:      endsOn,
+		Status:      optionalNamedString[LeagueSessionStatus](body.Status),
+		IsActive:    body.IsActive,
+	})
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[LeagueSessionResponse]{Data: newLeagueSessionResponse(*session)})
+}
 
 // @Summary		Delete a league session
-// @Description	Hard delete. Cascades to the session's divisions, teams and matches, including submitted results. Cannot be undone.
+// @Description	Hard delete. Cascades to the session's divisions, the teams created in them, and their matches, including submitted results. Cannot be undone. Refused with 409 while a team created in this session also plays in another session, since the cascade would remove it from that session too.
 // @Tags			sessions
 // @Produce		json
 // @Param			id	path	string	true	"league session id (uuid)"
@@ -82,9 +217,23 @@ func (h *Handler) UpdateLeagueSession(w http.ResponseWriter, r *http.Request) {}
 // @Failure		401	{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
 // @Failure		403	{object}	handler.ErrorResponse	"403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED"
 // @Failure		404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
+// @Failure		409	{object}	handler.ErrorResponse	"409001 CONFLICT (a team created here plays in another session)"
 // @Security		CSRFToken
 // @Router			/sessions/{id} [delete]
-func (h *Handler) DeleteLeagueSession(w http.ResponseWriter, r *http.Request) {}
+func (h *Handler) DeleteLeagueSession(w http.ResponseWriter, r *http.Request) {
+	id, err := handler.ParsePathUUID(r, "id")
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	if err := h.service.DeleteLeagueSession(r.Context(), id); err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	h.ReturnWithJSON(w, http.StatusNoContent, nil)
+}
 
 // @Summary		List a league session's weeks
 // @Description	One row per week that has team matches, ordered by week number. An existing session with no matches returns an empty list.
@@ -97,4 +246,74 @@ func (h *Handler) DeleteLeagueSession(w http.ResponseWriter, r *http.Request) {}
 // @Failure		403	{object}	handler.ErrorResponse	"403005 PERMISSION_DENIED"
 // @Failure		404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
 // @Router			/sessions/{id}/weeks [get]
-func (h *Handler) ListLeagueSessionWeeks(w http.ResponseWriter, r *http.Request) {}
+func (h *Handler) ListLeagueSessionWeeks(w http.ResponseWriter, r *http.Request) {
+	id, err := handler.ParsePathUUID(r, "id")
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	weeks, err := h.service.ListLeagueSessionWeeks(r.Context(), id)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	items := make([]LeagueSessionWeekResponse, 0, len(weeks))
+	for _, week := range weeks {
+		items = append(items, newLeagueSessionWeekResponse(week))
+	}
+
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]LeagueSessionWeekResponse]{
+		Data:     items,
+		Metadata: handler.NewMetadata(len(items)),
+	})
+}
+
+// parseLeagueSessionSort falls back to defaultLeagueSessionSort itself, because
+// model.ParseSort's default is always ascending.
+func parseLeagueSessionSort(raw string) (model.SortParams, error) {
+	if strings.TrimSpace(raw) == "" {
+		return defaultLeagueSessionSort, nil
+	}
+	return model.ParseSort(raw, leagueSessionSortFields, defaultLeagueSessionSort.Field)
+}
+
+func parseOptionalSeasonYear(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, nil
+	}
+	year, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, handler.ErrorWithMessage(handler.CodeValidationFailed, "season_year must be a whole number", err)
+	}
+	return year, nil
+}
+
+func parseLeagueSessionDate(field, value string) (time.Time, error) {
+	date, err := time.Parse(time.DateOnly, strings.TrimSpace(value))
+	if err != nil {
+		return time.Time{}, handler.ErrorWithMessage(handler.CodeValidationFailed, field+" must be a date as YYYY-MM-DD", err)
+	}
+	return date, nil
+}
+
+func parseOptionalLeagueSessionDate(field string, value *string) (*time.Time, error) {
+	if value == nil {
+		return nil, nil
+	}
+	date, err := parseLeagueSessionDate(field, *value)
+	if err != nil {
+		return nil, err
+	}
+	return &date, nil
+}
+
+func optionalNamedString[T ~string](value *string) *T {
+	if value == nil {
+		return nil
+	}
+	converted := T(*value)
+	return &converted
+}

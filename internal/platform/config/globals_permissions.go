@@ -13,6 +13,7 @@ const (
 	PermissionFeaturePermissions PermissionFeature = "PERMISSION"
 	PermissionFeatureTeams       PermissionFeature = "TEAM"
 	PermissionFeatureTeamRosters PermissionFeature = "ROSTER"
+	PermissionFeatureSessions    PermissionFeature = "SESSION"
 )
 
 type PermissionAction string
