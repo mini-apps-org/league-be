@@ -481,6 +481,391 @@ const docTemplate = `{
                 }
             }
         },
+        "/sessions": {
+            "get": {
+                "description": "Sessions of the league, capped at 200 rows. Not paged: metadata carries count only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "List league sessions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "case-insensitive match on name",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "SPRING",
+                            "SUMMER",
+                            "FALL"
+                        ],
+                        "type": "string",
+                        "description": "session type",
+                        "name": "session_type",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 2100,
+                        "minimum": 2000,
+                        "type": "integer",
+                        "description": "season year",
+                        "name": "season_year",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "DRAFT",
+                            "IN_PROGRESS",
+                            "COMPLETE",
+                            "CANCELLED"
+                        ],
+                        "type": "string",
+                        "description": "status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "name",
+                            "-name",
+                            "starts_on",
+                            "-starts_on",
+                            "season_year",
+                            "-season_year"
+                        ],
+                        "type": "string",
+                        "default": "-starts_on",
+                        "description": "sort order; a leading - sorts descending",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_sessions_LeagueSessionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "` + "`" + `name` + "`" + ` is trimmed and must be 3–60 characters, unique within the league. ` + "`" + `season_year` + "`" + ` is 2000–2100. ` + "`" + `ends_on` + "`" + ` must be on or after ` + "`" + `starts_on` + "`" + `. A missing ` + "`" + `status` + "`" + ` becomes DRAFT. ` + "`" + `is_active: true` + "`" + ` deactivates the league's other sessions.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Create a league session",
+                "parameters": [
+                    {
+                        "description": "league session to create",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/sessions.CreateLeagueSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "409001 CONFLICT (duplicate name)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sessions/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Get a league session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "league session id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "404001 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Hard delete. Cascades to the session's divisions, teams and matches, including submitted results. Cannot be undone.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Delete a league session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "league session id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "deleted"
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "404001 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Partial update: an absent field is left unchanged, and an empty body is rejected. The create rules apply to the merged result, so moving only ` + "`" + `ends_on` + "`" + ` before the existing ` + "`" + `starts_on` + "`" + ` fails. ` + "`" + `is_active: true` + "`" + ` deactivates the league's other sessions.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Update a league session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "league session id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/sessions.UpdateLeagueSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "404001 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "409001 CONFLICT (duplicate name)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sessions/{id}/weeks": {
+            "get": {
+                "description": "One row per week that has team matches, ordered by week number. An existing session with no matches returns an empty list.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "List a league session's weeks",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "league session id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_sessions_LeagueSessionWeekResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "404001 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/teams": {
             "get": {
                 "description": "Paged: ` + "`" + `limit` + "`" + ` rows per page (default 10). Pass ` + "`" + `metadata.next_cursor` + "`" + ` back as ` + "`" + `cursor` + "`" + ` for the next page, with the same filters and sort; it is null on the last page. ` + "`" + `metadata.total` + "`" + ` (rows matching the filters) is sent on the first page only.",
@@ -1492,6 +1877,44 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_sessions_LeagueSessionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/sessions.LeagueSessionResponse"
+                    }
+                },
+                "metadata": {
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_sessions_LeagueSessionWeekResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/sessions.LeagueSessionWeekResponse"
+                    }
+                },
+                "metadata": {
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
+                }
+            }
+        },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_teams_RosterPlayerResponse": {
             "type": "object",
             "properties": {
@@ -1567,6 +1990,22 @@ const docTemplate = `{
             "properties": {
                 "data": {
                     "$ref": "#/definitions/roles.RoleResponse"
+                },
+                "metadata": {
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/sessions.LeagueSessionResponse"
                 },
                 "metadata": {
                     "description": "lists only; nil for a single item",
@@ -1747,6 +2186,205 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "Team Captain"
+                }
+            }
+        },
+        "sessions.CreateLeagueSessionRequest": {
+            "type": "object",
+            "required": [
+                "ends_on",
+                "name",
+                "season_year",
+                "session_type",
+                "starts_on"
+            ],
+            "properties": {
+                "ends_on": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2027-04-30"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "default": false,
+                    "example": false
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "minLength": 3,
+                    "example": "Spring 2027"
+                },
+                "season_year": {
+                    "type": "integer",
+                    "maximum": 2100,
+                    "minimum": 2000,
+                    "example": 2027
+                },
+                "session_type": {
+                    "type": "string",
+                    "enum": [
+                        "SPRING",
+                        "SUMMER",
+                        "FALL"
+                    ],
+                    "example": "SPRING"
+                },
+                "starts_on": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2027-01-10"
+                },
+                "status": {
+                    "type": "string",
+                    "default": "DRAFT",
+                    "enum": [
+                        "DRAFT",
+                        "IN_PROGRESS",
+                        "COMPLETE",
+                        "CANCELLED"
+                    ],
+                    "example": "DRAFT"
+                }
+            }
+        },
+        "sessions.LeagueSessionResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "ends_on": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-12-20"
+                },
+                "has_submitted_results": {
+                    "description": "True when any of the session's team matches has status submitted.",
+                    "type": "boolean",
+                    "example": true
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "league_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Fall 2026"
+                },
+                "season_year": {
+                    "type": "integer",
+                    "example": 2026
+                },
+                "session_type": {
+                    "type": "string",
+                    "enum": [
+                        "SPRING",
+                        "SUMMER",
+                        "FALL"
+                    ],
+                    "example": "FALL"
+                },
+                "starts_on": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-09-01"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "DRAFT",
+                        "IN_PROGRESS",
+                        "COMPLETE",
+                        "CANCELLED"
+                    ],
+                    "example": "IN_PROGRESS"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "week_count": {
+                    "description": "Distinct team_matches.week_no values across the session's divisions.",
+                    "type": "integer",
+                    "example": 10
+                }
+            }
+        },
+        "sessions.LeagueSessionWeekResponse": {
+            "type": "object",
+            "properties": {
+                "first_scheduled_at": {
+                    "type": "string"
+                },
+                "match_count": {
+                    "type": "integer",
+                    "example": 4
+                },
+                "submitted_count": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "week_no": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "sessions.UpdateLeagueSessionRequest": {
+            "type": "object",
+            "properties": {
+                "ends_on": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2027-04-30"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "minLength": 3,
+                    "example": "Spring 2027"
+                },
+                "season_year": {
+                    "type": "integer",
+                    "maximum": 2100,
+                    "minimum": 2000,
+                    "example": 2027
+                },
+                "session_type": {
+                    "type": "string",
+                    "enum": [
+                        "SPRING",
+                        "SUMMER",
+                        "FALL"
+                    ],
+                    "example": "SPRING"
+                },
+                "starts_on": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2027-01-10"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "DRAFT",
+                        "IN_PROGRESS",
+                        "COMPLETE",
+                        "CANCELLED"
+                    ],
+                    "example": "IN_PROGRESS"
                 }
             }
         },

@@ -111,6 +111,28 @@ definitions:
         - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
         description: lists only; nil for a single item
     type: object
+  github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_sessions_LeagueSessionResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/sessions.LeagueSessionResponse'
+        type: array
+      metadata:
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
+    type: object
+  github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_sessions_LeagueSessionWeekResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/sessions.LeagueSessionWeekResponse'
+        type: array
+      metadata:
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
+    type: object
   github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_teams_RosterPlayerResponse:
     properties:
       data:
@@ -155,6 +177,15 @@ definitions:
     properties:
       data:
         $ref: '#/definitions/roles.RoleResponse'
+      metadata:
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
+    type: object
+  github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse:
+    properties:
+      data:
+        $ref: '#/definitions/sessions.LeagueSessionResponse'
       metadata:
         allOf:
         - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
@@ -267,6 +298,159 @@ definitions:
         type: string
       name:
         example: Team Captain
+        type: string
+    type: object
+  sessions.CreateLeagueSessionRequest:
+    properties:
+      ends_on:
+        example: "2027-04-30"
+        format: date
+        type: string
+      is_active:
+        default: false
+        example: false
+        type: boolean
+      name:
+        example: Spring 2027
+        maxLength: 60
+        minLength: 3
+        type: string
+      season_year:
+        example: 2027
+        maximum: 2100
+        minimum: 2000
+        type: integer
+      session_type:
+        enum:
+        - SPRING
+        - SUMMER
+        - FALL
+        example: SPRING
+        type: string
+      starts_on:
+        example: "2027-01-10"
+        format: date
+        type: string
+      status:
+        default: DRAFT
+        enum:
+        - DRAFT
+        - IN_PROGRESS
+        - COMPLETE
+        - CANCELLED
+        example: DRAFT
+        type: string
+    required:
+    - ends_on
+    - name
+    - season_year
+    - session_type
+    - starts_on
+    type: object
+  sessions.LeagueSessionResponse:
+    properties:
+      created_at:
+        type: string
+      ends_on:
+        example: "2026-12-20"
+        format: date
+        type: string
+      has_submitted_results:
+        description: True when any of the session's team matches has status submitted.
+        example: true
+        type: boolean
+      id:
+        format: uuid
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      league_id:
+        format: uuid
+        type: string
+      name:
+        example: Fall 2026
+        type: string
+      season_year:
+        example: 2026
+        type: integer
+      session_type:
+        enum:
+        - SPRING
+        - SUMMER
+        - FALL
+        example: FALL
+        type: string
+      starts_on:
+        example: "2026-09-01"
+        format: date
+        type: string
+      status:
+        enum:
+        - DRAFT
+        - IN_PROGRESS
+        - COMPLETE
+        - CANCELLED
+        example: IN_PROGRESS
+        type: string
+      updated_at:
+        type: string
+      week_count:
+        description: Distinct team_matches.week_no values across the session's divisions.
+        example: 10
+        type: integer
+    type: object
+  sessions.LeagueSessionWeekResponse:
+    properties:
+      first_scheduled_at:
+        type: string
+      match_count:
+        example: 4
+        type: integer
+      submitted_count:
+        example: 3
+        type: integer
+      week_no:
+        example: 1
+        type: integer
+    type: object
+  sessions.UpdateLeagueSessionRequest:
+    properties:
+      ends_on:
+        example: "2027-04-30"
+        format: date
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      name:
+        example: Spring 2027
+        maxLength: 60
+        minLength: 3
+        type: string
+      season_year:
+        example: 2027
+        maximum: 2100
+        minimum: 2000
+        type: integer
+      session_type:
+        enum:
+        - SPRING
+        - SUMMER
+        - FALL
+        example: SPRING
+        type: string
+      starts_on:
+        example: "2027-01-10"
+        format: date
+        type: string
+      status:
+        enum:
+        - DRAFT
+        - IN_PROGRESS
+        - COMPLETE
+        - CANCELLED
+        example: IN_PROGRESS
         type: string
     type: object
   teams.AddDivisionTeamRequest:
@@ -721,6 +905,273 @@ paths:
       summary: Permanently delete a role
       tags:
       - roles
+  /sessions:
+    get:
+      description: 'Sessions of the league, capped at 200 rows. Not paged: metadata
+        carries count only.'
+      parameters:
+      - description: case-insensitive match on name
+        in: query
+        name: q
+        type: string
+      - description: session type
+        enum:
+        - SPRING
+        - SUMMER
+        - FALL
+        in: query
+        name: session_type
+        type: string
+      - description: season year
+        in: query
+        maximum: 2100
+        minimum: 2000
+        name: season_year
+        type: integer
+      - description: status
+        enum:
+        - DRAFT
+        - IN_PROGRESS
+        - COMPLETE
+        - CANCELLED
+        in: query
+        name: status
+        type: string
+      - default: -starts_on
+        description: sort order; a leading - sorts descending
+        enum:
+        - name
+        - -name
+        - starts_on
+        - -starts_on
+        - season_year
+        - -season_year
+        in: query
+        name: sort
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_sessions_LeagueSessionResponse'
+        "400":
+          description: 400001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "401":
+          description: 401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 403005 PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      summary: List league sessions
+      tags:
+      - sessions
+    post:
+      consumes:
+      - application/json
+      description: '`name` is trimmed and must be 3–60 characters, unique within the
+        league. `season_year` is 2000–2100. `ends_on` must be on or after `starts_on`.
+        A missing `status` becomes DRAFT. `is_active: true` deactivates the league''s
+        other sessions.'
+      parameters:
+      - description: league session to create
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/sessions.CreateLeagueSessionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse'
+        "400":
+          description: 400001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "401":
+          description: 401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005
+            PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 409001 CONFLICT (duplicate name)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Create a league session
+      tags:
+      - sessions
+  /sessions/{id}:
+    delete:
+      description: Hard delete. Cascades to the session's divisions, teams and matches,
+        including submitted results. Cannot be undone.
+      parameters:
+      - description: league session id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: deleted
+        "400":
+          description: 400001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "401":
+          description: 401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005
+            PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 404001 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Delete a league session
+      tags:
+      - sessions
+    get:
+      parameters:
+      - description: league session id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse'
+        "400":
+          description: 400001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "401":
+          description: 401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 403005 PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 404001 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      summary: Get a league session
+      tags:
+      - sessions
+    patch:
+      consumes:
+      - application/json
+      description: 'Partial update: an absent field is left unchanged, and an empty
+        body is rejected. The create rules apply to the merged result, so moving only
+        `ends_on` before the existing `starts_on` fails. `is_active: true` deactivates
+        the league''s other sessions.'
+      parameters:
+      - description: league session id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/sessions.UpdateLeagueSessionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse'
+        "400":
+          description: 400001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "401":
+          description: 401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005
+            PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 404001 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 409001 CONFLICT (duplicate name)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Update a league session
+      tags:
+      - sessions
+  /sessions/{id}/weeks:
+    get:
+      description: One row per week that has team matches, ordered by week number.
+        An existing session with no matches returns an empty list.
+      parameters:
+      - description: league session id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_sessions_LeagueSessionWeekResponse'
+        "400":
+          description: 400001 VALIDATION_FAILED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "401":
+          description: 401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 403005 PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "404":
+          description: 404001 NOT_FOUND
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      summary: List a league session's weeks
+      tags:
+      - sessions
   /teams:
     delete:
       consumes:
