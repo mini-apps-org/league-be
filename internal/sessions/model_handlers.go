@@ -48,3 +48,30 @@ type LeagueSessionWeekResponse struct {
 	SubmittedCount   int       `json:"submitted_count" example:"3"`
 	FirstScheduledAt time.Time `json:"first_scheduled_at"`
 }
+
+func newLeagueSessionResponse(session LeagueSession) LeagueSessionResponse {
+	return LeagueSessionResponse{
+		ID:                  session.ID,
+		LeagueID:            session.LeagueID,
+		Name:                session.Name,
+		SessionType:         string(session.SessionType),
+		SeasonYear:          int(session.SeasonYear),
+		StartsOn:            session.StartsOn.Format(time.DateOnly),
+		EndsOn:              session.EndsOn.Format(time.DateOnly),
+		Status:              string(session.Status),
+		IsActive:            session.IsActive,
+		WeekCount:           int(session.WeekCount),
+		HasSubmittedResults: session.HasSubmittedResults,
+		CreatedAt:           session.CreatedAt,
+		UpdatedAt:           session.UpdatedAt,
+	}
+}
+
+func newLeagueSessionWeekResponse(week LeagueSessionWeek) LeagueSessionWeekResponse {
+	return LeagueSessionWeekResponse{
+		WeekNo:           int(week.WeekNo),
+		MatchCount:       int(week.MatchCount),
+		SubmittedCount:   int(week.SubmittedCount),
+		FirstScheduledAt: week.FirstScheduledAt,
+	}
+}
