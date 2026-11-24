@@ -32,8 +32,10 @@ CREATE TABLE IF NOT EXISTS users_sessions (
 	last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Supports logout-everywhere and session-expiry lookups.
-CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON users_sessions (user_id);
+-- One session per user: auth.ReplaceSession upserts with ON CONFLICT (user_id), which
+-- Postgres rejects unless user_id has a unique index. Also serves the logout-everywhere
+-- and session-expiry lookups.
+CREATE UNIQUE INDEX IF NOT EXISTS users_sessions_user_id_key ON users_sessions (user_id);
 
 -- Hierarchy: League -> Season -> Division -> Team -> Roster.
 -- Timezone controls league-local scheduling and season boundaries.
