@@ -104,7 +104,7 @@ func errorCode(err error) handler.ErrorCode {
 	return handler.AsAPIError(err).Code
 }
 
-// Each rule here is also a CHECK in 00003_league_sessions_rules.sql. If the service lets a
+// Each rule here is also a CHECK in 20261124-1-league-sessions-rules.sql. If the service lets a
 // bad value through, the client gets the constraint's generic message instead of one naming
 // the field; if it rejects a valid one, an operator cannot create the session at all.
 func TestCreateLeagueSessionValidation(t *testing.T) {

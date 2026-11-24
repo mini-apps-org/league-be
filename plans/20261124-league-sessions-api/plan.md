@@ -79,7 +79,7 @@ the final table shape.
 The `league_sessions` table already exists in `00001_init.sql`. This phase tightens it to the rules
 the API enforces; it does not create a new table.
 
-1. Add `db/migrations/00003_league_sessions_rules.sql`. Wrap it in `BEGIN; … COMMIT;` and make
+1. Add `db/migrations/2026/20261124-1-league-sessions-rules.sql`. Wrap it in `BEGIN; … COMMIT;` and make
    every statement re-runnable:
    ```sql
    BEGIN;
@@ -112,8 +112,8 @@ the API enforces; it does not create a new table.
    `seeds/20261106_seed.sql`, since the column default no longer gives it that value.
 4. Apply locally on a fresh database, then on the existing dev database:
    ```sh
-   psql "$DATABASE_URL" -f db/migrations/00003_league_sessions_rules.sql
-   psql "$DATABASE_URL" -f db/migrations/00003_league_sessions_rules.sql   # re-run is a no-op
+   psql "$DATABASE_URL" -f db/migrations/2026/20261124-1-league-sessions-rules.sql
+   psql "$DATABASE_URL" -f db/migrations/2026/20261124-1-league-sessions-rules.sql   # re-run is a no-op
    ```
    The seed has one active session with a valid name and year, so every constraint applies cleanly.
    On a database with dirty rows, find them first:
@@ -324,7 +324,7 @@ carries a comment saying what breaks in production if it fails.
 
 ## Phase 8 — Verify end to end — done
 
-As built: run against a scratch database from `000001-init.sql`, `00003` and the 20261122 seed,
+As built: run against a scratch database from `000001-init.sql`, `20261124-1-league-sessions-rules.sql` and the 20261122 seed,
 with `users_sessions` rows inserted for the seed's dev admin and dev captain instead of a browser
 sign-in. Every check below passed, plus 401001/401002 without or with a bad `sid`, 403001/403002
 on CSRF, and the live response keys matching the served swagger schemas.
@@ -349,7 +349,7 @@ on CSRF, and the live response keys matching the served swagger schemas.
    `feat(migration): enforce league session rules`,
    `docs(swagger): league sessions contract` and
    `feat(sessions): list, create, update and delete league sessions`.
-3. The schema PR body lists the manual step: apply `00003_league_sessions_rules.sql` before
+3. The schema PR body lists the manual step: apply `2026/20261124-1-league-sessions-rules.sql` before
    deploying, after running the dirty-row queries from Phase 0 against production.
 4. After the merge: a CHANGELOG entry and a minor tag (`0.10.0`; tags are at `0.9.0`).
 5. Follow-up in **league-solution-design:** in `07-api-design.md`, change `/seasons` to `/sessions`
