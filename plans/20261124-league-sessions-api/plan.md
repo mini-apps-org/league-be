@@ -38,7 +38,7 @@ not the login session (`users_sessions`, `internal/auth`).
 | D3 | **Default status.** The DB defaults to `IN_PROGRESS`; the admin form defaults to `DRAFT`. | Change the column default to `DRAFT` (Phase 0). The service still sets `DRAFT` explicitly when `status` is missing, so it does not depend on the default. |
 | D4 | **One active session per league.** | Enforce it in the schema with a partial unique index (Phase 0), and deactivate the others in the same transaction as the write (Phase 4). |
 | D5 | **Name and year rules in the schema.** | Add CHECKs as a backstop for the service validation: trimmed name 3–60 characters, `season_year` 2000–2100. Business rules live in Postgres. |
-| D6 | **Deleting a session that has submitted results.** | Allow it. The cascade removes its divisions and matches. |
+| D6 | **Deleting a session.** Submitted results are allowed to go with it. But `teams.division_id` cascades, so a team created in this session that also entered another session's division (`division_teams`) would be deleted from that session too. | **Block it** (built): the delete returns `409001` while such a team exists. Revisit if teams should outlive their home session. |
 | D7 | **Package name.** `auth` already has a `Session` type. | `internal/sessions`, matching the routes and the `session.*` permission codes. Types stay named `LeagueSession…`, so logs and stack traces never mix them up with `auth.Session`. |
 
 ## Contract summary
@@ -202,7 +202,12 @@ Branch: `feat/league-sessions-api`. Service params live in `models.go`, as in `t
    `time.DateOnly`.
 3. `model_handlers_test.go`: the date format, and that every response field is filled.
 
-## Phase 4 — Repository (`repositories.go`)
+## Phase 4 — Repository (`repositories.go`) — done
+
+As built: `constraintErrors` maps constraint names to sentinels, as in `teams`; the activation
+race (`league_sessions_one_active_per_league`) is `ErrLeagueSessionActiveConflict` → 409; and
+`DeleteLeagueSession` refuses a session homing a team that plays in another session (D6),
+inside the delete's transaction. A PATCH that 404s rolls back its deactivation.
 
 Follow `.claude/rules/database.md`: an `args` slice, one argument per line, placeholders only,
 wrapped errors, package sentinels, `rows.Err()`.
@@ -243,7 +248,7 @@ wrapped errors, package sentinels, `rows.Err()`.
      - Then `GROUP BY tm.week_no ORDER BY tm.week_no` with `count(*)`,
        `count(*) FILTER (WHERE tm.status = 'submitted')` and `min(tm.scheduled_at)`.
 
-## Phase 5 — Service (`services.go`)
+## Phase 5 — Service (`services.go`) — done
 
 `Service` is an interface and `service` the implementation, as in `roles`.
 
@@ -269,7 +274,11 @@ wrapped errors, package sentinels, `rows.Err()`.
    - no default league → `CodeInternal`, logged
 6. Validation messages are safe to show and in plain English; they're mainly for logs and swagger.
 
-## Phase 6 — Handlers (`handlers.go`) and routes
+## Phase 6 — Handlers (`handlers.go`) and routes — done
+
+As built: the route file is `internal/platform/router/session.go`. The contract gained `409` on
+DELETE (D6) and a second `409` reason on POST and PATCH (concurrent activation); `swagger.*` was
+regenerated in the same change.
 
 1. Add the `service Service` field and `NewHandler` to the Phase 1 `Handler`, then fill in the
    stub bodies of `ListLeagueSessions`, `GetLeagueSession`, `CreateLeagueSession`,
@@ -281,14 +290,19 @@ wrapped errors, package sentinels, `rows.Err()`.
    - Leave the annotation blocks as they are; the behaviour must match them.
 2. Add `PermissionFeatureSessions PermissionFeature = "SESSION"` in
    `internal/platform/config/globals_permissions.go`. It maps to the codes `session.read` and so on.
-3. Add `internal/platform/router/league_session.go` with `registerLeagueSessionRoute`. It uses the
+3. Add `internal/platform/router/session.go` with `registerLeagueSessionRoute`. It uses the
    same `guard(feature, next)` pattern as `role.go`. `/sessions/{id}/weeks` is a GET, so it needs
    `session.read`.
 4. Call it from `NewRouter` after `registerRoleRoute`.
 5. Run `make swagger`. `docs/swagger/*` must not change; a diff means the contract moved and needs
    the review described at the end of Phase 1.
 
-## Phase 7 — Tests
+## Phase 7 — Tests — done
+
+As built: `services_test.go`, `handlers_test.go` and `router/session_test.go`. The router test runs
+the real permission middleware with a fake session, and stops each request at a handler 400 so no
+database is needed. Mutation-checked: guarding POST with the wrong feature, or making the default
+sort ascending, fails the suite.
 
 Stdlib `testing` with table cases and a fake `Repository`, so no database is needed. Each test
 carries a comment saying what breaks in production if it fails.
@@ -308,7 +322,12 @@ carries a comment saying what breaks in production if it fails.
 5. **Router:** each route needs the right permission code for its method. A user with only
    `session.read` gets `403` on POST.
 
-## Phase 8 — Verify end to end
+## Phase 8 — Verify end to end — done
+
+As built: run against a scratch database from `000001-init.sql`, `00003` and the 20261122 seed,
+with `users_sessions` rows inserted for the seed's dev admin and dev captain instead of a browser
+sign-in. Every check below passed, plus 401001/401002 without or with a bad `sid`, 403001/403002
+on CSRF, and the live response keys matching the served swagger schemas.
 
 1. Run `test -z "$(gofmt -l .)"`, `make vet` and `make test`.
 2. Start the API with `make run`, get the `sid` and `csrf` cookies from a signed-in browser session,
@@ -319,7 +338,8 @@ carries a comment saying what breaks in production if it fails.
    - a PATCH that sets `is_active: true`: Fall 2026 must become inactive
    - DELETE (204), then GET (404)
    - `/weeks` on the seeded session
-3. A captain or player account gets `403` on every route.
+3. A captain gets `200` on the reads and `403005` on POST, PATCH and DELETE: the seed grants
+   CAPTAIN `session.read`.
 4. Each response matches its schema in Swagger UI (`/swagger/index.html`).
 
 ## Phase 9 — Ship
@@ -331,7 +351,7 @@ carries a comment saying what breaks in production if it fails.
    `feat(sessions): list, create, update and delete league sessions`.
 3. The schema PR body lists the manual step: apply `00003_league_sessions_rules.sql` before
    deploying, after running the dirty-row queries from Phase 0 against production.
-4. After the merge: a CHANGELOG entry and a minor tag (`0.4.0`).
+4. After the merge: a CHANGELOG entry and a minor tag (`0.10.0`; tags are at `0.9.0`).
 5. Follow-up in **league-solution-design:** in `07-api-design.md`, change `/seasons` to `/sessions`
    and add the new routes; mark sessions as built in chapter 15.
 
