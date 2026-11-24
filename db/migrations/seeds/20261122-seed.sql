@@ -41,8 +41,8 @@ VALUES ('MVIP League', 'Development league', 'Ho Chi Minh City', 'ops@mvip-leagu
 
 -- Fall 2026 runs Sep -> Dec, so season_year and the dates agree here; a session that
 -- crossed into January would still carry season_year 2026.
-INSERT INTO league_sessions (league_id, name, session_type, season_year, starts_on, ends_on, is_active)
-SELECT l.id, 'Fall 2026', 'FALL', 2026, '2026-09-01', '2026-12-20', true
+INSERT INTO league_sessions (league_id, name, session_type, season_year, starts_on, ends_on, status, is_active)
+SELECT l.id, 'Fall 2026', 'FALL', 2026, '2026-09-01', '2026-12-20', 'IN_PROGRESS', true
 FROM leagues l WHERE l.name = 'MVIP League';
 
 INSERT INTO divisions (season_id, name, format, skill_level_cap)
