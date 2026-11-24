@@ -1,8 +1,8 @@
 # Rules: schema migrations
 
 Applies to every change to the database schema: `db/migrations/000001-init.sql` and the
-files under `db/migrations/<year>/`. There is no migration runner; files are applied with
-`psql -f`, so their names and contents are the whole contract.
+files under `db/migrations/<year>/`. There is no migration table: `make migrate` applies the
+files with `psql -f` in the order of §5, so their names and contents are the whole contract.
 
 ---
 
@@ -93,8 +93,12 @@ db/migrations/<year>/*.sql              -- existing databases, in name order
 db/migrations/seeds/<yyyymmdd>-seed.sql -- development data, last: the LATEST seed only
 ```
 
-List the migrations a PR adds, in order, in its description: nothing applies them
-automatically.
+`make migrate` follows the first two lines: it runs `000001-init.sql` only when the
+database has no schema yet, then every `<year>/*.sql` in name order. Because it re-runs
+every migration each time, each one must be safe to run twice (§3).
+
+List the migrations a PR adds, in order, in its description: nothing applies them on
+deploy.
 
 ---
 
