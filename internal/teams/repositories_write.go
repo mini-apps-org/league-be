@@ -46,7 +46,7 @@ RETURNING ` + teamColumns
 	const enterDivisionQuery = `INSERT INTO division_teams (division_id, team_id) VALUES ($1, $2)`
 
 	var team Team
-	err := pgx.BeginFunc(ctx, r.pgPool, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(ctx, r.conn(ctx), func(tx pgx.Tx) error {
 		createTeamArgs := []any{
 			params.DivisionID, // $1 division_id
 			params.TeamCode,   // $2 team_code
@@ -97,7 +97,7 @@ RETURNING ` + teamColumns
 		params.VenueID,         // $5 venue_id, NULL leaves it
 	}
 
-	team, err := repo.QueryOne[Team](ctx, r.pgPool, query, args...)
+	team, err := repo.QueryOne[Team](ctx, r.conn(ctx), query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrTeamNotFound
 	}
@@ -128,7 +128,7 @@ WHERE team_id = $1 AND left_at IS NULL`
 		id,
 	}
 
-	err := pgx.BeginFunc(ctx, r.pgPool, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(ctx, r.conn(ctx), func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, deleteTeamQuery, args...)
 		if err != nil {
 			return err
@@ -154,7 +154,7 @@ func (r *repository) PermanentDeleteTeam(ctx context.Context, id string) error {
 		id,
 	}
 
-	tag, err := r.pgPool.Exec(ctx, query, args...)
+	tag, err := r.conn(ctx).Exec(ctx, query, args...)
 	if sentinel := constraintError(err); sentinel != nil {
 		return sentinel
 	}
@@ -175,7 +175,7 @@ func (r *repository) missingOrLiveTeamError(ctx context.Context, id string) erro
 	}
 
 	var exists bool
-	if err := r.pgPool.QueryRow(ctx, query, args...).Scan(&exists); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, query, args...).Scan(&exists); err != nil {
 		return fmt.Errorf("teams: check team %s: %w", id, err)
 	}
 	if exists {
@@ -208,7 +208,7 @@ SELECT id FROM deleted`
 		ids, // $1 team ids
 	}
 
-	rows, err := r.pgPool.Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("teams: bulk soft delete teams: %w", err)
 	}
@@ -258,7 +258,7 @@ LEFT JOIN teams t ON t.id = requested.id`
 		deletedIDs []string
 		states     = map[string]teamDeleteState{}
 	)
-	err := pgx.BeginFunc(ctx, r.pgPool, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(ctx, r.conn(ctx), func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, deleteQuery, args...)
 		if err != nil {
 			return err
@@ -331,7 +331,7 @@ RETURNING ` + divisionTeamColumns
 		teamID,     // $2 team_id
 	}
 
-	entry, err := repo.QueryOne[DivisionTeam](ctx, r.pgPool, query, args...)
+	entry, err := repo.QueryOne[DivisionTeam](ctx, r.conn(ctx), query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrTeamNotFound
 	}
@@ -353,7 +353,7 @@ func (r *repository) RemoveDivisionTeam(ctx context.Context, divisionID, teamID 
 		teamID,     // $2 team_id
 	}
 
-	tag, err := r.pgPool.Exec(ctx, query, args...)
+	tag, err := r.conn(ctx).Exec(ctx, query, args...)
 	if sentinel := constraintError(err); sentinel != nil {
 		return sentinel
 	}
@@ -367,14 +367,14 @@ func (r *repository) RemoveDivisionTeam(ctx context.Context, divisionID, teamID 
 }
 
 func (r *repository) AddRosterPlayer(ctx context.Context, params RosterEntryServiceParams) error {
-	if err := insertRosterRow(ctx, r.pgPool, params); err != nil {
+	if err := insertRosterRow(ctx, r.conn(ctx), params); err != nil {
 		return fmt.Errorf("teams: add roster player %s to team %s: %w", params.PlayerID, params.TeamID, err)
 	}
 	return nil
 }
 
 func (r *repository) RemoveRosterPlayer(ctx context.Context, params RosterEntryServiceParams) error {
-	if err := closeRosterRow(ctx, r.pgPool, params); err != nil {
+	if err := closeRosterRow(ctx, r.conn(ctx), params); err != nil {
 		return fmt.Errorf("teams: remove roster player %s from team %s: %w", params.PlayerID, params.TeamID, err)
 	}
 	return nil
@@ -384,7 +384,7 @@ func (r *repository) RemoveRosterPlayer(ctx context.Context, params RosterEntryS
 // transaction, so the player is never on both rosters nor on neither. Closing first
 // frees the player's place in the division for a transfer within it.
 func (r *repository) TransferRosterPlayer(ctx context.Context, params TransferRosterPlayerServiceParams) error {
-	err := pgx.BeginFunc(ctx, r.pgPool, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(ctx, r.conn(ctx), func(tx pgx.Tx) error {
 		if err := closeRosterRow(ctx, tx, params.From); err != nil {
 			return err
 		}

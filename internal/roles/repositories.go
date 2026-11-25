@@ -11,6 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nguyentanvinh/league-be/internal/platform/handler/repo"
+
+	"github.com/nguyentanvinh/league-be/internal/platform/db"
 )
 
 // pgUniqueViolationCode is Postgres SQLSTATE 23505.
@@ -42,6 +44,11 @@ func NewRepo(pool *pgxpool.Pool, logger *slog.Logger) Repository {
 	return &repository{pgPool: pool, logger: logger.With(slog.String("component", "roles.repository"))}
 }
 
+// conn is the transaction carried by ctx, if a service opened one, else the pool.
+func (r *repository) conn(ctx context.Context) db.Querier {
+	return db.ConnFromContext(ctx, r.pgPool)
+}
+
 func (r *repository) CreateRole(ctx context.Context, params CreateRoleServiceParams) (*Role, error) {
 	const query = `
 INSERT INTO roles (code, name, description)
@@ -53,7 +60,7 @@ RETURNING ` + roleColumns
 		params.Description, // $3 description
 	}
 
-	role, err := repo.QueryOne[Role](ctx, r.pgPool, query, args...)
+	role, err := repo.QueryOne[Role](ctx, r.conn(ctx), query, args...)
 	if isUniqueViolation(err) {
 		return nil, ErrDuplicateRoleCode
 	}
@@ -69,7 +76,7 @@ func (r *repository) GetRoleByID(ctx context.Context, id string) (*Role, error) 
 		id,
 	}
 
-	role, err := repo.QueryOne[Role](ctx, r.pgPool, query, args...)
+	role, err := repo.QueryOne[Role](ctx, r.conn(ctx), query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrRoleNotFound
 	}
@@ -85,7 +92,7 @@ func (r *repository) ListRoles(ctx context.Context) ([]Role, error) {
 		roleListLimit,
 	}
 
-	roles, err := repo.QueryAll[Role](ctx, r.pgPool, query, args...)
+	roles, err := repo.QueryAll[Role](ctx, r.conn(ctx), query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("roles: all: %w", err)
 	}
@@ -108,7 +115,7 @@ RETURNING ` + roleColumns
 		params.Description, // $3 description, NULL leaves it
 	}
 
-	role, err := repo.QueryOne[Role](ctx, r.pgPool, query, args...)
+	role, err := repo.QueryOne[Role](ctx, r.conn(ctx), query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrRoleNotFound
 	}
@@ -130,7 +137,7 @@ WHERE id = $1 AND NOT is_deleted`
 		id,
 	}
 
-	tag, err := r.pgPool.Exec(ctx, query, args...)
+	tag, err := r.conn(ctx).Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("roles: soft delete %s: %w", id, err)
 	}
@@ -148,7 +155,7 @@ func (r *repository) PermanentDeleteRole(ctx context.Context, id string) error {
 		id,
 	}
 
-	tag, err := r.pgPool.Exec(ctx, query, args...)
+	tag, err := r.conn(ctx).Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("roles: permanently delete %s: %w", id, err)
 	}
@@ -166,7 +173,7 @@ func (r *repository) missingOrLiveRoleError(ctx context.Context, id string) erro
 	}
 
 	var exists bool
-	if err := r.pgPool.QueryRow(ctx, query, args...).Scan(&exists); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, query, args...).Scan(&exists); err != nil {
 		return fmt.Errorf("roles: check role %s: %w", id, err)
 	}
 	if exists {

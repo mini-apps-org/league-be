@@ -5,6 +5,8 @@ import (
 	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/nguyentanvinh/league-be/internal/platform/db"
 )
 
 // TODO vincent: Need write as the array format and using String.joins to easier remove or add the new field as needed
@@ -45,4 +47,9 @@ type repository struct {
 
 func NewRepo(pool *pgxpool.Pool, logger *slog.Logger) Repository {
 	return &repository{pgPool: pool, logger: logger.With(slog.String("component", "teams.repository"))}
+}
+
+// conn is the transaction carried by ctx, if a service opened one, else the pool.
+func (r *repository) conn(ctx context.Context) db.Querier {
+	return db.ConnFromContext(ctx, r.pgPool)
 }

@@ -11,6 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nguyentanvinh/league-be/internal/platform/handler/repo"
+
+	"github.com/nguyentanvinh/league-be/internal/platform/db"
 )
 
 var (
@@ -39,6 +41,11 @@ type repository struct {
 
 func NewRepo(pool *pgxpool.Pool, logger *slog.Logger) Repository {
 	return &repository{pgPool: pool, logger: logger.With(slog.String("component", "auth.repository"))}
+}
+
+// conn is the transaction carried by ctx, if a service opened one, else the pool.
+func (r *repository) conn(ctx context.Context) db.Querier {
+	return db.ConnFromContext(ctx, r.pgPool)
 }
 
 // UpsertGoogleIdentity grants signUpRoleCode in the same statement that inserts
@@ -79,7 +86,7 @@ SELECT ` + userColumns + `, is_new_user FROM upserted`
 	// would reject the extra column. Keep this list in userColumns order.
 	var user User
 	var isNewUser bool
-	err := r.pgPool.QueryRow(ctx, query, args...).Scan(
+	err := r.conn(ctx).QueryRow(ctx, query, args...).Scan(
 		&user.ID,            // id
 		&user.Email,         // email
 		&user.EmailVerified, // email_verified
@@ -115,7 +122,7 @@ WHERE id = $1`
 		id,
 	}
 
-	user, err := repo.QueryOne[UserWithAccess](ctx, r.pgPool, query, args...)
+	user, err := repo.QueryOne[UserWithAccess](ctx, r.conn(ctx), query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNoUser
 	}
@@ -139,7 +146,7 @@ ON CONFLICT (user_id) DO UPDATE SET
 		session.UserID, // $2 user_id
 	}
 
-	if _, err := r.pgPool.Exec(ctx, query, args...); err != nil {
+	if _, err := r.conn(ctx).Exec(ctx, query, args...); err != nil {
 		return fmt.Errorf("auth: replace session: %w", err)
 	}
 	return nil
@@ -156,7 +163,7 @@ WHERE id = $1 AND created_at > $2 AND last_seen_at > $3`
 		idleCutoff,     // $3 last_seen_at floor
 	}
 
-	session, err := repo.QueryOne[Session](ctx, r.pgPool, query, args...)
+	session, err := repo.QueryOne[Session](ctx, r.conn(ctx), query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNoSession
 	}
@@ -172,7 +179,7 @@ func (r *repository) UpdateSessionLastSeenAt(ctx context.Context, id string) err
 		id,
 	}
 
-	if _, err := r.pgPool.Exec(ctx, query, args...); err != nil {
+	if _, err := r.conn(ctx).Exec(ctx, query, args...); err != nil {
 		return fmt.Errorf("auth: update session last_seen_at: %w", err)
 	}
 	return nil
@@ -184,7 +191,7 @@ func (r *repository) DeleteSession(ctx context.Context, id string) error {
 		id,
 	}
 
-	if _, err := r.pgPool.Exec(ctx, query, args...); err != nil {
+	if _, err := r.conn(ctx).Exec(ctx, query, args...); err != nil {
 		return fmt.Errorf("auth: delete session: %w", err)
 	}
 	return nil
@@ -196,7 +203,7 @@ func (r *repository) DeleteUserSessions(ctx context.Context, userID string) erro
 		userID,
 	}
 
-	if _, err := r.pgPool.Exec(ctx, query, args...); err != nil {
+	if _, err := r.conn(ctx).Exec(ctx, query, args...); err != nil {
 		return fmt.Errorf("auth: delete user sessions: %w", err)
 	}
 	return nil
@@ -209,7 +216,7 @@ func (r *repository) DeleteExpiredSessions(ctx context.Context, absoluteCutoff, 
 		idleCutoff,     // $2 last_seen_at ceiling
 	}
 
-	tag, err := r.pgPool.Exec(ctx, query, args...)
+	tag, err := r.conn(ctx).Exec(ctx, query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("auth: delete expired sessions: %w", err)
 	}

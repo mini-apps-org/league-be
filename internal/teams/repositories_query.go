@@ -43,7 +43,7 @@ func (r *repository) GetTeamByID(ctx context.Context, id string) (*Team, error) 
 		id,
 	}
 
-	team, err := repo.QueryOne[Team](ctx, r.pgPool, query, args...)
+	team, err := repo.QueryOne[Team](ctx, r.conn(ctx), query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrTeamNotFound
 	}
@@ -76,7 +76,7 @@ func (r *repository) ListTeams(ctx context.Context, params ListTeamsServiceParam
 		teamColumns, strings.Join(filters, " AND "),
 		column, params.Sort.Direction(), params.Sort.Direction(), len(args))
 
-	teams, err := repo.QueryAll[Team](ctx, r.pgPool, query, args...)
+	teams, err := repo.QueryAll[Team](ctx, r.conn(ctx), query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("teams: list teams: %w", err)
 	}
@@ -89,7 +89,7 @@ func (r *repository) CountTeams(ctx context.Context, params ListTeamsServicePara
 	filters, args := teamListFilters(params)
 	query := fmt.Sprintf("SELECT count(*) FROM teams WHERE %s", strings.Join(filters, " AND "))
 
-	total, err := repo.QueryCount(ctx, r.pgPool, query, args...)
+	total, err := repo.QueryCount(ctx, r.conn(ctx), query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("teams: count teams: %w", err)
 	}
@@ -128,7 +128,7 @@ WHERE dt.division_id = $1 AND dt.team_id = $2`
 		teamID,     // $2 team_id
 	}
 
-	entry, err := repo.QueryOne[DivisionTeam](ctx, r.pgPool, query, args...)
+	entry, err := repo.QueryOne[DivisionTeam](ctx, r.conn(ctx), query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrTeamNotInDivision
 	}
@@ -160,7 +160,7 @@ func (r *repository) ListRosterPlayers(ctx context.Context, params ListRosterPla
 		rosterPlayerSelect, strings.Join(filters, " AND "),
 		column, params.Sort.Direction(), params.Sort.Direction(), len(args))
 
-	players, err := repo.QueryAll[RosterPlayer](ctx, r.pgPool, query, args...)
+	players, err := repo.QueryAll[RosterPlayer](ctx, r.conn(ctx), query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("teams: list roster of team %s in division %s: %w", params.TeamID, params.DivisionID, err)
 	}
@@ -181,7 +181,7 @@ func (r *repository) CountRosterPlayers(ctx context.Context, params ListRosterPl
 	filters, args := rosterListFilters(params)
 	query := fmt.Sprintf("%s\n  AND %s", rosterPlayerCount, strings.Join(filters, " AND "))
 
-	total, err := repo.QueryCount(ctx, r.pgPool, query, args...)
+	total, err := repo.QueryCount(ctx, r.conn(ctx), query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("teams: count roster of team %s in division %s: %w", params.TeamID, params.DivisionID, err)
 	}
@@ -215,7 +215,7 @@ func (r *repository) GetRosterPlayer(ctx context.Context, params RosterEntryServ
 		params.PlayerID,   // $3 player_id
 	}
 
-	player, err := repo.QueryOne[RosterPlayer](ctx, r.pgPool, query, args...)
+	player, err := repo.QueryOne[RosterPlayer](ctx, r.conn(ctx), query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrRosterPlayerNotFound
 	}
@@ -239,7 +239,7 @@ SELECT EXISTS (
 	}
 
 	var isActive bool
-	if err := r.pgPool.QueryRow(ctx, query, args...).Scan(&isActive); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, query, args...).Scan(&isActive); err != nil {
 		return false, fmt.Errorf("teams: check player %s on team %s: %w", playerID, teamID, err)
 	}
 	return isActive, nil
@@ -254,7 +254,7 @@ func (r *repository) GetPlayerIDByUserID(ctx context.Context, userID string) (st
 	}
 
 	var playerID string
-	err := r.pgPool.QueryRow(ctx, query, args...).Scan(&playerID)
+	err := r.conn(ctx).QueryRow(ctx, query, args...).Scan(&playerID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", ErrPlayerNotFound
 	}
@@ -271,7 +271,7 @@ func (r *repository) IsPaidPlayer(ctx context.Context, playerID string) (bool, e
 	}
 
 	var isPaid bool
-	err := r.pgPool.QueryRow(ctx, query, args...).Scan(&isPaid)
+	err := r.conn(ctx).QueryRow(ctx, query, args...).Scan(&isPaid)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, ErrPlayerNotFound
 	}
