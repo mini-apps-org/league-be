@@ -10,6 +10,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nguyentanvinh/league-be/internal/platform/handler/repo"
+
+	"github.com/nguyentanvinh/league-be/internal/platform/db"
 )
 
 const permissionListLimit = 200
@@ -31,13 +33,18 @@ func NewRepo(pool *pgxpool.Pool, logger *slog.Logger) Repository {
 	return &repository{pgPool: pool, logger: logger.With(slog.String("component", "permissions.repository"))}
 }
 
+// conn is the transaction carried by ctx, if a service opened one, else the pool.
+func (r *repository) conn(ctx context.Context) db.Querier {
+	return db.ConnFromContext(ctx, r.pgPool)
+}
+
 func (r *repository) GetPermissionByID(ctx context.Context, id string) (*Permission, error) {
 	const query = `SELECT ` + permissionColumns + ` FROM permissions WHERE id = $1`
 	args := []any{
 		id,
 	}
 
-	permission, err := repo.QueryOne[Permission](ctx, r.pgPool, query, args...)
+	permission, err := repo.QueryOne[Permission](ctx, r.conn(ctx), query, args...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrPermissionNotFound
 	}
@@ -53,7 +60,7 @@ func (r *repository) ListPermissions(ctx context.Context) ([]Permission, error) 
 		permissionListLimit,
 	}
 
-	permissions, err := repo.QueryAll[Permission](ctx, r.pgPool, query, args...)
+	permissions, err := repo.QueryAll[Permission](ctx, r.conn(ctx), query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("permissions: all: %w", err)
 	}
@@ -73,7 +80,7 @@ ORDER BY p.code`
 		userID,
 	}
 
-	codes, err := repo.QueryStrings(ctx, r.pgPool, query, args...)
+	codes, err := repo.QueryStrings(ctx, r.conn(ctx), query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("permissions: user codes %s: %w", userID, err)
 	}

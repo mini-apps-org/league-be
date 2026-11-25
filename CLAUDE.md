@@ -11,6 +11,8 @@
   divisions and seasons, the ID formats, and who may change a roster.
 - `docs/local-testing.md` — running the API on localhost and calling it: `.env`, the
   database, Google sign-in, granting yourself a role, Postman and curl, error codes.
+- `docs/transactions.md` — running several repository calls as one unit from a service:
+  `db.Transactor`, `txCtx`, what rolls back, and when not to use it.
 - `docs/workflow.md` — package layout, errors, HTTP, config, migrations and tests,
   then the step-by-step path from a feature branch to a deployed image.
 
