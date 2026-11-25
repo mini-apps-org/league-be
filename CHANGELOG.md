@@ -1,15 +1,15 @@
 # Changelog
 
-## [TBD](https://github.com/mini-apps-org/league-be/releases/tag/TBD) - 2026-11-XX
+## [0.10.0](https://github.com/mini-apps-org/league-be/releases/tag/0.10.0) - 2026-11-25
 
-- [#TBD](https://github.com/mini-apps-org/league-be/pull/TBD)
+- [#PR11](https://github.com/mini-apps-org/league-be/pull/11)
   - feat(db): add `db.Transactor` — a service can run several repository calls in one transaction that rolls back on any error
   - refactor(db): every repository query runs on the transaction carried by `ctx`, falling back to the pool
   - docs(transactions): add `docs/transactions.md` — when to use `RunInTransaction`, what rolls back, and the `txCtx` rules
 
-## [TBD](https://github.com/mini-apps-org/league-be/releases/tag/TBD) - 2026-11-XX
+## [0.9.0](https://github.com/mini-apps-org/league-be/releases/tag/0.9.0) - 2026-11-24
 
-- [#TBD](https://github.com/mini-apps-org/league-be/pull/TBD)
+- [#PR8](https://github.com/mini-apps-org/league-be/pull/8)
   - refactor(errors): add error mappings for per-feature
   - feat(errors): update 6-digit int64 error codes + remove dead error code
 
