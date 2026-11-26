@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS league_sessions (
 	season_year   SMALLINT  NOT NULL,  -- Explicit because seasons may cross calendar years
 	starts_on   DATE        NOT NULL,
 	ends_on     DATE        NOT NULL,
-	status      TEXT        NOT NULL DEFAULT 'IN_PROGRESS'
+	status      TEXT        NOT NULL DEFAULT 'DRAFT'
 		CHECK (status IN ('DRAFT', 'IN_PROGRESS', 'COMPLETE', 'CANCELLED')),
 	is_active   BOOLEAN     NOT NULL DEFAULT false,
 	-- A soft-deleted session is hidden from every read and never active; its name stays taken.
@@ -87,6 +87,11 @@ CREATE TABLE IF NOT EXISTS league_sessions (
 	UNIQUE (league_id, name),
 	CHECK (ends_on >= starts_on)
 );
+
+-- The API deactivates the league's other sessions in the same transaction first,
+-- so this only fires on a bug or a manual write.
+CREATE UNIQUE INDEX IF NOT EXISTS league_sessions_one_active_per_league
+	ON league_sessions (league_id) WHERE is_active;
 
 CREATE TABLE IF NOT EXISTS divisions (
 	id               UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
