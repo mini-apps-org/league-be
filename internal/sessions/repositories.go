@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/nguyentanvinh/league-be/internal/platform/db"
 	"github.com/nguyentanvinh/league-be/internal/platform/handler/repo"
 )
 
@@ -42,8 +43,6 @@ var constraintErrors = map[string]error{
 	"league_sessions_league_id_name_key":    ErrDuplicateLeagueSessionName,
 	"league_sessions_one_active_per_league": ErrLeagueSessionActiveConflict,
 	"league_sessions_check":                 ErrInvalidLeagueSession, // ends_on >= starts_on
-	"league_sessions_name_length_check":     ErrInvalidLeagueSession,
-	"league_sessions_season_year_check":     ErrInvalidLeagueSession,
 	"league_sessions_session_type_check":    ErrInvalidLeagueSession,
 	"league_sessions_status_check":          ErrInvalidLeagueSession,
 	// A delete that races a team entering another session's division: the cascade
@@ -54,12 +53,12 @@ var constraintErrors = map[string]error{
 
 type Repository interface {
 	GetDefaultLeagueID(ctx context.Context) (string, error)
-	ListLeagueSessions(ctx context.Context, leagueID string, params ListLeagueSessionsServiceParams) ([]LeagueSession, error)
-	GetLeagueSessionByID(ctx context.Context, leagueID, id string) (*LeagueSession, error)
-	CreateLeagueSession(ctx context.Context, leagueID string, params CreateLeagueSessionServiceParams) (*LeagueSession, error)
-	UpdateLeagueSession(ctx context.Context, leagueID, id string, params UpdateLeagueSessionServiceParams) (*LeagueSession, error)
-	DeleteLeagueSession(ctx context.Context, leagueID, id string) error
-	ListLeagueSessionWeeks(ctx context.Context, leagueID, id string) ([]LeagueSessionWeek, error)
+	ListSessions(ctx context.Context, leagueID string, params ListLeagueSessionsServiceParams) ([]LeagueSession, error)
+	GetSessionByID(ctx context.Context, leagueID, leagueSessionID string) (*LeagueSession, error)
+	CreateSession(ctx context.Context, leagueID string, params CreateLeagueSessionServiceParams) (*LeagueSession, error)
+	UpdateSession(ctx context.Context, leagueID, leagueSessionID string, params UpdateLeagueSessionServiceParams) (*LeagueSession, error)
+	DeleteSession(ctx context.Context, leagueID, leagueSessionID string) error
+	ListSessionWeeks(ctx context.Context, leagueID, leagueSessionID string) ([]LeagueSessionWeek, error)
 }
 
 type repository struct {
@@ -71,15 +70,10 @@ func NewRepo(pool *pgxpool.Pool, logger *slog.Logger) Repository {
 	return &repository{pgPool: pool, logger: logger.With(slog.String("component", "sessions.repository"))}
 }
 
-// querier is the pool or a transaction, so a read can run inside a write's transaction.
-type querier interface {
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+// conn is the transaction carried by ctx, if a service opened one, else the pool.
+func (r *repository) conn(ctx context.Context) db.Querier {
+	return db.ConnFromContext(ctx, r.pgPool)
 }
-
-var (
-	_ querier = (*pgxpool.Pool)(nil)
-	_ querier = pgx.Tx(nil)
-)
 
 // GetDefaultLeagueID resolves the one ACTIVE league the MVP runs. LIMIT 2 is enough to
 // tell "exactly one" from "more than one".
@@ -89,7 +83,7 @@ func (r *repository) GetDefaultLeagueID(ctx context.Context) (string, error) {
 		"ACTIVE",
 	}
 
-	ids, err := repo.QueryStrings(ctx, r.pgPool, query, args...)
+	ids, err := repo.QueryStrings(ctx, r.conn(ctx), query, args...)
 	if err != nil {
 		return "", fmt.Errorf("sessions: get default league: %w", err)
 	}
@@ -99,7 +93,7 @@ func (r *repository) GetDefaultLeagueID(ctx context.Context) (string, error) {
 	return ids[0], nil
 }
 
-func (r *repository) ListLeagueSessions(ctx context.Context, leagueID string, params ListLeagueSessionsServiceParams) ([]LeagueSession, error) {
+func (r *repository) ListSessions(ctx context.Context, leagueID string, params ListLeagueSessionsServiceParams) ([]LeagueSession, error) {
 	var (
 		filters []string
 		args    []any
@@ -133,42 +127,42 @@ func (r *repository) ListLeagueSessions(ctx context.Context, leagueID string, pa
 	query := fmt.Sprintf("SELECT %s FROM league_sessions ls WHERE %s ORDER BY %s %s, ls.id %s LIMIT $%d",
 		leagueSessionColumns, strings.Join(filters, " AND "), column, direction, direction, len(args))
 
-	sessions, err := repo.QueryAll[LeagueSession](ctx, r.pgPool, query, args...)
+	sessions, err := repo.QueryAll[LeagueSession](ctx, r.conn(ctx), query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("sessions: list league sessions: %w", err)
 	}
 	return sessions, nil
 }
 
-func (r *repository) GetLeagueSessionByID(ctx context.Context, leagueID, id string) (*LeagueSession, error) {
-	return getLeagueSession(ctx, r.pgPool, leagueID, id)
+func (r *repository) GetSessionByID(ctx context.Context, leagueID, leagueSessionID string) (*LeagueSession, error) {
+	return getLeagueSession(ctx, r.conn(ctx), leagueID, leagueSessionID)
 }
 
-func getLeagueSession(ctx context.Context, conn querier, leagueID, id string) (*LeagueSession, error) {
+func getLeagueSession(ctx context.Context, conn db.Querier, leagueID, leagueSessionID string) (*LeagueSession, error) {
 	const query = `SELECT ` + leagueSessionColumns + ` FROM league_sessions ls WHERE ls.league_id = $1 AND ls.id = $2`
 	args := []any{
-		leagueID, // $1 league_id
-		id,       // $2 id
+		leagueID,        // $1 league_id
+		leagueSessionID, // $2 id
 	}
 
 	rows, err := conn.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("sessions: get league session %s: %w", id, err)
+		return nil, fmt.Errorf("sessions: get league session %s: %w", leagueSessionID, err)
 	}
 	session, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[LeagueSession])
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrLeagueSessionNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("sessions: get league session %s: %w", id, err)
+		return nil, fmt.Errorf("sessions: get league session %s: %w", leagueSessionID, err)
 	}
 	return &session, nil
 }
 
-// CreateLeagueSession deactivates the league's other sessions first when the new one is
+// CreateSession deactivates the league's other sessions first when the new one is
 // active, in the same transaction: league_sessions_one_active_per_league would reject
 // the insert otherwise.
-func (r *repository) CreateLeagueSession(ctx context.Context, leagueID string, params CreateLeagueSessionServiceParams) (*LeagueSession, error) {
+func (r *repository) CreateSession(ctx context.Context, leagueID string, params CreateLeagueSessionServiceParams) (*LeagueSession, error) {
 	const query = `
 INSERT INTO league_sessions (league_id, name, session_type, season_year, starts_on, ends_on, status, is_active)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -185,20 +179,20 @@ RETURNING id`
 	}
 
 	var session *LeagueSession
-	err := pgx.BeginFunc(ctx, r.pgPool, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(ctx, r.conn(ctx), func(tx pgx.Tx) error {
 		if params.IsActive {
 			if err := deactivateOtherLeagueSessions(ctx, tx, leagueID, nil); err != nil {
 				return err
 			}
 		}
 
-		var id string
-		if err := tx.QueryRow(ctx, query, args...).Scan(&id); err != nil {
+		var leagueSessionID string
+		if err := tx.QueryRow(ctx, query, args...).Scan(&leagueSessionID); err != nil {
 			return err
 		}
 
 		var err error
-		session, err = getLeagueSession(ctx, tx, leagueID, id)
+		session, err = getLeagueSession(ctx, tx, leagueID, leagueSessionID)
 		return err
 	})
 	if sentinel := constraintError(err); sentinel != nil {
@@ -210,10 +204,10 @@ RETURNING id`
 	return session, nil
 }
 
-// UpdateLeagueSession applies a partial update: COALESCE leaves a column alone when its
+// UpdateSession applies a partial update: COALESCE leaves a column alone when its
 // argument is NULL. The service has already validated the merged result; the schema
 // checks catch a concurrent update that breaks it anyway.
-func (r *repository) UpdateLeagueSession(ctx context.Context, leagueID, id string, params UpdateLeagueSessionServiceParams) (*LeagueSession, error) {
+func (r *repository) UpdateSession(ctx context.Context, leagueID, leagueSessionID string, params UpdateLeagueSessionServiceParams) (*LeagueSession, error) {
 	const query = `
 UPDATE league_sessions SET
     name         = COALESCE($3, name),
@@ -226,21 +220,21 @@ UPDATE league_sessions SET
     updated_at   = now()
 WHERE league_id = $1 AND id = $2`
 	args := []any{
-		leagueID,                           // $1 league_id
-		id,                                 // $2 id
-		params.Name,                        // $3 name, NULL leaves it
-		optionalString(params.SessionType), // $4 session_type, NULL leaves it
-		params.SeasonYear,                  // $5 season_year, NULL leaves it
-		params.StartsOn,                    // $6 starts_on, NULL leaves it
-		params.EndsOn,                      // $7 ends_on, NULL leaves it
-		optionalString(params.Status),      // $8 status, NULL leaves it
-		params.IsActive,                    // $9 is_active, NULL leaves it
+		leagueID,           // $1 league_id
+		leagueSessionID,    // $2 id
+		params.Name,        // $3 name, NULL leaves it
+		params.SessionType, // $4 session_type, NULL leaves it
+		params.SeasonYear,  // $5 season_year, NULL leaves it
+		params.StartsOn,    // $6 starts_on, NULL leaves it
+		params.EndsOn,      // $7 ends_on, NULL leaves it
+		params.Status,      // $8 status, NULL leaves it
+		params.IsActive,    // $9 is_active, NULL leaves it
 	}
 
 	var session *LeagueSession
-	err := pgx.BeginFunc(ctx, r.pgPool, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(ctx, r.conn(ctx), func(tx pgx.Tx) error {
 		if params.IsActive != nil && *params.IsActive {
-			if err := deactivateOtherLeagueSessions(ctx, tx, leagueID, &id); err != nil {
+			if err := deactivateOtherLeagueSessions(ctx, tx, leagueID, &leagueSessionID); err != nil {
 				return err
 			}
 		}
@@ -254,7 +248,7 @@ WHERE league_id = $1 AND id = $2`
 			return ErrLeagueSessionNotFound
 		}
 
-		session, err = getLeagueSession(ctx, tx, leagueID, id)
+		session, err = getLeagueSession(ctx, tx, leagueID, leagueSessionID)
 		return err
 	})
 	if errors.Is(err, ErrLeagueSessionNotFound) {
@@ -264,7 +258,7 @@ WHERE league_id = $1 AND id = $2`
 		return nil, sentinel
 	}
 	if err != nil {
-		return nil, fmt.Errorf("sessions: update league session %s: %w", id, err)
+		return nil, fmt.Errorf("sessions: update league session %s: %w", leagueSessionID, err)
 	}
 	return session, nil
 }
@@ -288,10 +282,10 @@ WHERE league_id = $1 AND is_active AND id IS DISTINCT FROM $2`
 	return nil
 }
 
-// DeleteLeagueSession refuses a session that homes a team (teams.division_id) which has
+// DeleteSession refuses a session that homes a team (teams.division_id) which has
 // also entered a division of another session. The cascade through teams.division_id
 // would delete that team from the other session too, roster included.
-func (r *repository) DeleteLeagueSession(ctx context.Context, leagueID, id string) error {
+func (r *repository) DeleteSession(ctx context.Context, leagueID, leagueSessionID string) error {
 	const sharedTeamsQuery = `
 SELECT EXISTS (
     SELECT 1
@@ -302,15 +296,15 @@ SELECT EXISTS (
     WHERE home.season_id = $1 AND other.season_id <> $1
 )`
 	sharedTeamsArgs := []any{
-		id,
+		leagueSessionID,
 	}
 	const deleteQuery = `DELETE FROM league_sessions WHERE league_id = $1 AND id = $2`
 	deleteArgs := []any{
-		leagueID, // $1 league_id
-		id,       // $2 id
+		leagueID,        // $1 league_id
+		leagueSessionID, // $2 id
 	}
 
-	err := pgx.BeginFunc(ctx, r.pgPool, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(ctx, r.conn(ctx), func(tx pgx.Tx) error {
 		var hasSharedTeams bool
 		if err := tx.QueryRow(ctx, sharedTeamsQuery, sharedTeamsArgs...).Scan(&hasSharedTeams); err != nil {
 			return err
@@ -335,23 +329,23 @@ SELECT EXISTS (
 		return sentinel
 	}
 	if err != nil {
-		return fmt.Errorf("sessions: delete league session %s: %w", id, err)
+		return fmt.Errorf("sessions: delete league session %s: %w", leagueSessionID, err)
 	}
 	return nil
 }
 
-// ListLeagueSessionWeeks checks the session first, so a missing session is a 404 rather
+// ListSessionWeeks checks the session first, so a missing session is a 404 rather
 // than an empty list.
-func (r *repository) ListLeagueSessionWeeks(ctx context.Context, leagueID, id string) ([]LeagueSessionWeek, error) {
+func (r *repository) ListSessionWeeks(ctx context.Context, leagueID, leagueSessionID string) ([]LeagueSessionWeek, error) {
 	const existsQuery = `SELECT EXISTS (SELECT 1 FROM league_sessions WHERE league_id = $1 AND id = $2)`
 	existsArgs := []any{
-		leagueID, // $1 league_id
-		id,       // $2 id
+		leagueID,        // $1 league_id
+		leagueSessionID, // $2 id
 	}
 
 	var exists bool
-	if err := r.pgPool.QueryRow(ctx, existsQuery, existsArgs...).Scan(&exists); err != nil {
-		return nil, fmt.Errorf("sessions: check league session %s: %w", id, err)
+	if err := r.conn(ctx).QueryRow(ctx, existsQuery, existsArgs...).Scan(&exists); err != nil {
+		return nil, fmt.Errorf("sessions: check league session %s: %w", leagueSessionID, err)
 	}
 	if !exists {
 		return nil, ErrLeagueSessionNotFound
@@ -370,12 +364,12 @@ WHERE d.season_id = $1
 GROUP BY tm.week_no
 ORDER BY tm.week_no`
 	weeksArgs := []any{
-		id,
+		leagueSessionID,
 	}
 
-	weeks, err := repo.QueryAll[LeagueSessionWeek](ctx, r.pgPool, weeksQuery, weeksArgs...)
+	weeks, err := repo.QueryAll[LeagueSessionWeek](ctx, r.conn(ctx), weeksQuery, weeksArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("sessions: list league session %s weeks: %w", id, err)
+		return nil, fmt.Errorf("sessions: list league session %s weeks: %w", leagueSessionID, err)
 	}
 	return weeks, nil
 }
@@ -386,14 +380,6 @@ func constraintError(err error) error {
 		return nil
 	}
 	return constraintErrors[pgErr.ConstraintName]
-}
-
-func optionalString[T ~string](value *T) *string {
-	if value == nil {
-		return nil
-	}
-	converted := string(*value)
-	return &converted
 }
 
 func escapeLike(value string) string {

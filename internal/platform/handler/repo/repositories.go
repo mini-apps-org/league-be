@@ -4,11 +4,12 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/nguyentanvinh/league-be/internal/platform/db"
 )
 
-func QueryAll[T any](ctx context.Context, pool *pgxpool.Pool, query string, args ...any) ([]T, error) {
-	rows, err := pool.Query(ctx, query, args...)
+func QueryAll[T any](ctx context.Context, conn db.Querier, query string, args ...any) ([]T, error) {
+	rows, err := conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -24,8 +25,8 @@ func QueryAll[T any](ctx context.Context, pool *pgxpool.Pool, query string, args
 	return out, nil
 }
 
-func QueryOne[T any](ctx context.Context, pool *pgxpool.Pool, query string, args ...any) (*T, error) {
-	rows, err := pool.Query(ctx, query, args...)
+func QueryOne[T any](ctx context.Context, conn db.Querier, query string, args ...any) (*T, error) {
+	rows, err := conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -37,8 +38,8 @@ func QueryOne[T any](ctx context.Context, pool *pgxpool.Pool, query string, args
 	return &row, nil
 }
 
-func QueryStrings(ctx context.Context, pool *pgxpool.Pool, query string, args ...any) ([]string, error) {
-	rows, err := pool.Query(ctx, query, args...)
+func QueryStrings(ctx context.Context, conn db.Querier, query string, args ...any) ([]string, error) {
+	rows, err := conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -60,9 +61,9 @@ func QueryStrings(ctx context.Context, pool *pgxpool.Pool, query string, args ..
 
 // QueryCount runs a single-value count query, such as SELECT count(*) FROM … WHERE …, and
 // returns the count.
-func QueryCount(ctx context.Context, pool *pgxpool.Pool, query string, args ...any) (int64, error) {
+func QueryCount(ctx context.Context, conn db.Querier, query string, args ...any) (int64, error) {
 	var count int64
-	if err := pool.QueryRow(ctx, query, args...).Scan(&count); err != nil {
+	if err := conn.QueryRow(ctx, query, args...).Scan(&count); err != nil {
 		return 0, err
 	}
 	return count, nil

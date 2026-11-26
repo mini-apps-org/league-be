@@ -3,8 +3,9 @@ package config
 type ContextKey string
 
 const (
-	ContextKeyRequestID ContextKey = "request_id"
-	ContextKeyUserID    ContextKey = "user_id"
+	ContextKeyRequestID   ContextKey = "request_id"
+	ContextKeyUserID      ContextKey = "user_id"
+	ContextKeyTransaction ContextKey = "transaction"
 )
 
 const HeaderRequestID = "X-Request-Id"

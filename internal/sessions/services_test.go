@@ -39,7 +39,7 @@ func (f *fakeRepository) GetDefaultLeagueID(context.Context) (string, error) {
 	return testLeagueID, nil
 }
 
-func (f *fakeRepository) GetLeagueSessionByID(_ context.Context, leagueID, id string) (*LeagueSession, error) {
+func (f *fakeRepository) GetSessionByID(_ context.Context, leagueID, id string) (*LeagueSession, error) {
 	if leagueID != testLeagueID || id != testLeagueSessionID {
 		return nil, ErrLeagueSessionNotFound
 	}
@@ -55,7 +55,7 @@ func (f *fakeRepository) GetLeagueSessionByID(_ context.Context, leagueID, id st
 	}, nil
 }
 
-func (f *fakeRepository) CreateLeagueSession(_ context.Context, _ string, params CreateLeagueSessionServiceParams) (*LeagueSession, error) {
+func (f *fakeRepository) CreateSession(_ context.Context, _ string, params CreateLeagueSessionServiceParams) (*LeagueSession, error) {
 	if f.writeErr != nil {
 		return nil, f.writeErr
 	}
@@ -63,7 +63,7 @@ func (f *fakeRepository) CreateLeagueSession(_ context.Context, _ string, params
 	return &LeagueSession{Name: params.Name, Status: params.Status}, nil
 }
 
-func (f *fakeRepository) UpdateLeagueSession(_ context.Context, _, id string, params UpdateLeagueSessionServiceParams) (*LeagueSession, error) {
+func (f *fakeRepository) UpdateSession(_ context.Context, _, id string, params UpdateLeagueSessionServiceParams) (*LeagueSession, error) {
 	if f.writeErr != nil {
 		return nil, f.writeErr
 	}
@@ -71,7 +71,7 @@ func (f *fakeRepository) UpdateLeagueSession(_ context.Context, _, id string, pa
 	return &LeagueSession{ID: id}, nil
 }
 
-func (f *fakeRepository) DeleteLeagueSession(context.Context, string, string) error {
+func (f *fakeRepository) DeleteSession(context.Context, string, string) error {
 	if f.writeErr != nil {
 		return f.writeErr
 	}
@@ -104,9 +104,9 @@ func errorCode(err error) handler.ErrorCode {
 	return handler.AsAPIError(err).Code
 }
 
-// Each rule here is also a CHECK in 20261124-1-league-sessions-rules.sql. If the service lets a
-// bad value through, the client gets the constraint's generic message instead of one naming
-// the field; if it rejects a valid one, an operator cannot create the session at all.
+// The service is the only check on name length and season year, so a bad value it lets
+// through is stored as is; and a valid one it rejects means an operator cannot create the
+// session at all.
 func TestCreateLeagueSessionValidation(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -137,7 +137,7 @@ func TestCreateLeagueSessionValidation(t *testing.T) {
 			params := validCreateParams()
 			tt.change(&params)
 
-			_, err := NewService(repo, testLogger).CreateLeagueSession(context.Background(), params)
+			_, err := NewService(repo, testLogger).CreateSession(context.Background(), params)
 
 			if got := errorCode(err); got != tt.wantCode {
 				t.Fatalf("code = %d, want %d (err: %v)", got, tt.wantCode, err)
@@ -156,7 +156,7 @@ func TestCreateLeagueSessionDefaultsStatusAndTrimsName(t *testing.T) {
 	params := validCreateParams()
 	params.Name = "  Spring 2027  "
 
-	if _, err := NewService(repo, testLogger).CreateLeagueSession(context.Background(), params); err != nil {
+	if _, err := NewService(repo, testLogger).CreateSession(context.Background(), params); err != nil {
 		t.Fatal(err)
 	}
 
@@ -196,7 +196,7 @@ func TestUpdateLeagueSessionValidatesMergedResult(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &fakeRepository{}
 
-			_, err := NewService(repo, testLogger).UpdateLeagueSession(context.Background(), tt.id, tt.params)
+			_, err := NewService(repo, testLogger).UpdateSessionByID(context.Background(), tt.id, tt.params)
 
 			if got := errorCode(err); got != tt.wantCode {
 				t.Fatalf("code = %d, want %d (err: %v)", got, tt.wantCode, err)
@@ -223,7 +223,7 @@ func TestListLeagueSessionsRejectsBadFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewService(&fakeRepository{}, testLogger).ListLeagueSessions(context.Background(), tt.params)
+			_, err := NewService(&fakeRepository{}, testLogger).ListSessions(context.Background(), tt.params)
 			if got := errorCode(err); got != handler.CodeValidationFailed {
 				t.Errorf("code = %d, want %d (err: %v)", got, handler.CodeValidationFailed, err)
 			}
@@ -251,7 +251,7 @@ func TestLeagueSessionErrorMapping(t *testing.T) {
 		t.Run(tt.sentinel.Error(), func(t *testing.T) {
 			repo := &fakeRepository{writeErr: fmt.Errorf("wrapped: %w", tt.sentinel)}
 
-			err := NewService(repo, testLogger).DeleteLeagueSession(context.Background(), testLeagueSessionID)
+			err := NewService(repo, testLogger).DeleteSessionByID(context.Background(), testLeagueSessionID)
 
 			apiErr := handler.AsAPIError(err)
 			if apiErr.Code != tt.wantCode || apiErr.Status() != tt.wantStatus {
@@ -267,7 +267,7 @@ func TestNoDefaultLeagueFailsEveryCall(t *testing.T) {
 	repo := &fakeRepository{defaultLeagueErr: fmt.Errorf("%w: found 2", ErrNoDefaultLeague)}
 	service := NewService(repo, testLogger)
 
-	_, err := service.CreateLeagueSession(context.Background(), validCreateParams())
+	_, err := service.CreateSession(context.Background(), validCreateParams())
 
 	if got := errorCode(err); got != handler.CodeInternal {
 		t.Errorf("code = %d, want %d", got, handler.CodeInternal)
@@ -288,9 +288,8 @@ func TestConstraintErrorMapsByName(t *testing.T) {
 	}{
 		{"duplicate name", &pgconn.PgError{Code: "23505", ConstraintName: "league_sessions_league_id_name_key"}, ErrDuplicateLeagueSessionName},
 		{"second active session", &pgconn.PgError{Code: "23505", ConstraintName: "league_sessions_one_active_per_league"}, ErrLeagueSessionActiveConflict},
-		{"season year check", &pgconn.PgError{Code: "23514", ConstraintName: "league_sessions_season_year_check"}, ErrInvalidLeagueSession},
 		{"date order check", &pgconn.PgError{Code: "23514", ConstraintName: "league_sessions_check"}, ErrInvalidLeagueSession},
-		{"wrapped", fmt.Errorf("tx: %w", &pgconn.PgError{Code: "23514", ConstraintName: "league_sessions_name_length_check"}), ErrInvalidLeagueSession},
+		{"wrapped", fmt.Errorf("tx: %w", &pgconn.PgError{Code: "23514", ConstraintName: "league_sessions_status_check"}), ErrInvalidLeagueSession},
 		{"fixture still references a cascaded team", &pgconn.PgError{Code: "23503", ConstraintName: "team_matches_home_division_team_fkey"}, ErrLeagueSessionHasSharedTeams},
 		{"unmapped constraint", &pgconn.PgError{Code: "23505", ConstraintName: "something_else_key"}, nil},
 		{"not a postgres error", errors.New("connection reset"), nil},

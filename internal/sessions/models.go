@@ -89,9 +89,9 @@ type LeagueSessionWeek struct {
 
 // ListLeagueSessionsServiceParams filters are ANDed; an empty one is not applied.
 type ListLeagueSessionsServiceParams struct {
-	Query       string // matches name, case-insensitive
+	Query       string
 	SessionType LeagueSessionType
-	SeasonYear  int // 0 is unset
+	SeasonYear  int
 	Status      LeagueSessionStatus
 	Sort        model.SortParams
 }
@@ -102,7 +102,7 @@ type CreateLeagueSessionServiceParams struct {
 	SeasonYear  int
 	StartsOn    time.Time
 	EndsOn      time.Time
-	Status      LeagueSessionStatus // "" becomes DRAFT
+	Status      LeagueSessionStatus
 	IsActive    bool
 }
 

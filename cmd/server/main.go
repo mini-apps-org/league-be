@@ -72,6 +72,7 @@ func main() {
 			http.MethodGet,
 			http.MethodPost,
 			http.MethodPut,
+			http.MethodPatch,
 			http.MethodDelete,
 			http.MethodOptions,
 			http.MethodHead,

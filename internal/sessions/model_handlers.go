@@ -5,23 +5,23 @@ import "time"
 // The validate tags only mark the required fields in swagger; no validator reads them.
 // The service validates the body.
 type CreateLeagueSessionRequest struct {
-	Name        string  `json:"name" validate:"required" example:"Spring 2027" minLength:"3" maxLength:"60"`
-	SessionType string  `json:"session_type" validate:"required" enums:"SPRING,SUMMER,FALL" example:"SPRING"`
-	SeasonYear  int     `json:"season_year" validate:"required" minimum:"2000" maximum:"2100" example:"2027"`
-	StartsOn    string  `json:"starts_on" validate:"required" format:"date" example:"2027-01-10"`
-	EndsOn      string  `json:"ends_on" validate:"required" format:"date" example:"2027-04-30"`
-	Status      *string `json:"status,omitempty" enums:"DRAFT,IN_PROGRESS,COMPLETE,CANCELLED" default:"DRAFT" example:"DRAFT"`
-	IsActive    *bool   `json:"is_active,omitempty" default:"false" example:"false"`
+	Name        string               `json:"name" validate:"required" example:"Spring 2027" minLength:"3" maxLength:"60"`
+	SessionType LeagueSessionType    `json:"session_type" swaggertype:"string" validate:"required" enums:"SPRING,SUMMER,FALL" example:"SPRING"`
+	SeasonYear  int                  `json:"season_year" validate:"required" minimum:"2000" maximum:"2100" example:"2027"`
+	StartsOn    string               `json:"starts_on" validate:"required" format:"date" example:"2027-01-10"`
+	EndsOn      string               `json:"ends_on" validate:"required" format:"date" example:"2027-04-30"`
+	Status      *LeagueSessionStatus `json:"status,omitempty" swaggertype:"string" enums:"DRAFT,IN_PROGRESS,COMPLETE,CANCELLED" default:"DRAFT" example:"DRAFT"`
+	IsActive    *bool                `json:"is_active,omitempty" default:"false" example:"false"`
 }
 
 type UpdateLeagueSessionRequest struct {
-	Name        *string `json:"name,omitempty" example:"Spring 2027" minLength:"3" maxLength:"60"`
-	SessionType *string `json:"session_type,omitempty" enums:"SPRING,SUMMER,FALL" example:"SPRING"`
-	SeasonYear  *int    `json:"season_year,omitempty" minimum:"2000" maximum:"2100" example:"2027"`
-	StartsOn    *string `json:"starts_on,omitempty" format:"date" example:"2027-01-10"`
-	EndsOn      *string `json:"ends_on,omitempty" format:"date" example:"2027-04-30"`
-	Status      *string `json:"status,omitempty" enums:"DRAFT,IN_PROGRESS,COMPLETE,CANCELLED" example:"IN_PROGRESS"`
-	IsActive    *bool   `json:"is_active,omitempty" example:"true"`
+	Name        *string              `json:"name,omitempty" example:"Spring 2027" minLength:"3" maxLength:"60"`
+	SessionType *LeagueSessionType   `json:"session_type,omitempty" swaggertype:"string" enums:"SPRING,SUMMER,FALL" example:"SPRING"`
+	SeasonYear  *int                 `json:"season_year,omitempty" minimum:"2000" maximum:"2100" example:"2027"`
+	StartsOn    *string              `json:"starts_on,omitempty" format:"date" example:"2027-01-10"`
+	EndsOn      *string              `json:"ends_on,omitempty" format:"date" example:"2027-04-30"`
+	Status      *LeagueSessionStatus `json:"status,omitempty" swaggertype:"string" enums:"DRAFT,IN_PROGRESS,COMPLETE,CANCELLED" example:"IN_PROGRESS"`
+	IsActive    *bool                `json:"is_active,omitempty" example:"true"`
 }
 
 type LeagueSessionResponse struct {

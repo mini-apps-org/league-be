@@ -34,7 +34,7 @@ func NewHandler(cfg *config.Config, service Service) Handler {
 // @Failure		401				{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
 // @Failure		403				{object}	handler.ErrorResponse	"403005 PERMISSION_DENIED"
 // @Router			/sessions [get]
-func (h *Handler) ListLeagueSessions(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
 	sort, err := parseLeagueSessionSort(query.Get("sort"))
@@ -48,7 +48,7 @@ func (h *Handler) ListLeagueSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessions, err := h.service.ListLeagueSessions(r.Context(), ListLeagueSessionsServiceParams{
+	sessions, err := h.service.ListSessions(r.Context(), ListLeagueSessionsServiceParams{
 		Query:       query.Get("q"),
 		SessionType: LeagueSessionType(query.Get("session_type")),
 		SeasonYear:  seasonYear,
@@ -81,14 +81,14 @@ func (h *Handler) ListLeagueSessions(w http.ResponseWriter, r *http.Request) {
 // @Failure	403	{object}	handler.ErrorResponse	"403005 PERMISSION_DENIED"
 // @Failure	404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
 // @Router		/sessions/{id} [get]
-func (h *Handler) GetLeagueSession(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetSessionByID(w http.ResponseWriter, r *http.Request) {
 	id, err := handler.ParsePathUUID(r, "id")
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}
 
-	session, err := h.service.GetLeagueSessionByID(r.Context(), id)
+	session, err := h.service.GetSessionByID(r.Context(), id)
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
@@ -110,7 +110,7 @@ func (h *Handler) GetLeagueSession(w http.ResponseWriter, r *http.Request) {
 // @Failure		409		{object}	handler.ErrorResponse	"409001 CONFLICT (duplicate name, or another session made active at the same time)"
 // @Security		CSRFToken
 // @Router			/sessions [post]
-func (h *Handler) CreateLeagueSession(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 	var body CreateLeagueSessionRequest
 	if err := h.DecodeJSON(w, r, &body); err != nil {
 		h.ReturnWithError(w, r, handler.InvalidJSONBodyError(err))
@@ -130,19 +130,19 @@ func (h *Handler) CreateLeagueSession(w http.ResponseWriter, r *http.Request) {
 
 	params := CreateLeagueSessionServiceParams{
 		Name:        body.Name,
-		SessionType: LeagueSessionType(body.SessionType),
+		SessionType: body.SessionType,
 		SeasonYear:  body.SeasonYear,
 		StartsOn:    startsOn,
 		EndsOn:      endsOn,
 	}
 	if body.Status != nil {
-		params.Status = LeagueSessionStatus(*body.Status)
+		params.Status = *body.Status
 	}
 	if body.IsActive != nil {
 		params.IsActive = *body.IsActive
 	}
 
-	session, err := h.service.CreateLeagueSession(r.Context(), params)
+	session, err := h.service.CreateSession(r.Context(), params)
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
@@ -166,7 +166,7 @@ func (h *Handler) CreateLeagueSession(w http.ResponseWriter, r *http.Request) {
 // @Failure		409		{object}	handler.ErrorResponse	"409001 CONFLICT (duplicate name, or another session made active at the same time)"
 // @Security		CSRFToken
 // @Router			/sessions/{id} [patch]
-func (h *Handler) UpdateLeagueSession(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UpdateSessionByID(w http.ResponseWriter, r *http.Request) {
 	id, err := handler.ParsePathUUID(r, "id")
 	if err != nil {
 		h.ReturnWithError(w, r, err)
@@ -190,13 +190,13 @@ func (h *Handler) UpdateLeagueSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := h.service.UpdateLeagueSession(r.Context(), id, UpdateLeagueSessionServiceParams{
+	session, err := h.service.UpdateSessionByID(r.Context(), id, UpdateLeagueSessionServiceParams{
 		Name:        body.Name,
-		SessionType: optionalNamedString[LeagueSessionType](body.SessionType),
+		SessionType: body.SessionType,
 		SeasonYear:  body.SeasonYear,
 		StartsOn:    startsOn,
 		EndsOn:      endsOn,
-		Status:      optionalNamedString[LeagueSessionStatus](body.Status),
+		Status:      body.Status,
 		IsActive:    body.IsActive,
 	})
 	if err != nil {
@@ -220,14 +220,14 @@ func (h *Handler) UpdateLeagueSession(w http.ResponseWriter, r *http.Request) {
 // @Failure		409	{object}	handler.ErrorResponse	"409001 CONFLICT (a team created here plays in another session)"
 // @Security		CSRFToken
 // @Router			/sessions/{id} [delete]
-func (h *Handler) DeleteLeagueSession(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteSessionByID(w http.ResponseWriter, r *http.Request) {
 	id, err := handler.ParsePathUUID(r, "id")
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}
 
-	if err := h.service.DeleteLeagueSession(r.Context(), id); err != nil {
+	if err := h.service.DeleteSessionByID(r.Context(), id); err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}
@@ -246,14 +246,14 @@ func (h *Handler) DeleteLeagueSession(w http.ResponseWriter, r *http.Request) {
 // @Failure		403	{object}	handler.ErrorResponse	"403005 PERMISSION_DENIED"
 // @Failure		404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
 // @Router			/sessions/{id}/weeks [get]
-func (h *Handler) ListLeagueSessionWeeks(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListSessionWeeks(w http.ResponseWriter, r *http.Request) {
 	id, err := handler.ParsePathUUID(r, "id")
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}
 
-	weeks, err := h.service.ListLeagueSessionWeeks(r.Context(), id)
+	weeks, err := h.service.ListSessionWeeks(r.Context(), id)
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
@@ -308,12 +308,4 @@ func parseOptionalLeagueSessionDate(field string, value *string) (*time.Time, er
 		return nil, err
 	}
 	return &date, nil
-}
-
-func optionalNamedString[T ~string](value *string) *T {
-	if value == nil {
-		return nil
-	}
-	converted := T(*value)
-	return &converted
 }
