@@ -474,6 +474,582 @@
                 }
             }
         },
+        "/sessions": {
+            "get": {
+                "description": "Paged: `limit` rows per page (default 10). Pass `metadata.next_cursor` back as `cursor` for the next page, with the same filters and sort; it is null on the last page. `metadata.total` (rows matching the filters) is sent on the first page only. Soft-deleted sessions are hidden.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "List league sessions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "case-insensitive match on name",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "SPRING",
+                            "SUMMER",
+                            "FALL"
+                        ],
+                        "type": "string",
+                        "description": "session type",
+                        "name": "session_type",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 2100,
+                        "minimum": 2000,
+                        "type": "integer",
+                        "description": "season year",
+                        "name": "season_year",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "DRAFT",
+                            "IN_PROGRESS",
+                            "COMPLETE",
+                            "CANCELLED"
+                        ],
+                        "type": "string",
+                        "description": "status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "name",
+                            "-name",
+                            "starts_on",
+                            "-starts_on",
+                            "season_year",
+                            "-season_year"
+                        ],
+                        "type": "string",
+                        "default": "-starts_on",
+                        "description": "sort order; a leading - sorts descending",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "rows per page, 1-200 (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "metadata.next_cursor of the previous page",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_sessions_LeagueSessionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "`name` is trimmed and must be 3–60 characters, unique within the league. `season_year` is 2000–2100. `ends_on` must be on or after `starts_on`. A missing `status` becomes DRAFT. `is_active: true` deactivates the league's other sessions.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Create a league session",
+                "parameters": [
+                    {
+                        "description": "league session to create",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/sessions.CreateLeagueSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "409001 CONFLICT (duplicate name, or another session made active at the same time)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Best effort, in one statement: every live session in `ids` is soft-deleted, as DELETE /sessions/{id} does. A session that cannot be deleted is listed in `failed` with the code and message the single delete returns (404001 missing or already deleted); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Soft-delete several league sessions",
+                "parameters": [
+                    {
+                        "description": "league sessions to soft-delete",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/sessions.BulkDeleteLeagueSessionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_BulkDeleteLeagueSessionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sessions/permanent": {
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Best effort, in one transaction: every session in `ids` that is soft-deleted and homes no team playing in another session is removed, as DELETE /sessions/{id}/permanent does, cascade included. A session that cannot be deleted is listed in `failed` (404001 missing, 409001 not deleted yet or a team created there plays in another session); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored. Cannot be undone.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Permanently delete several league sessions",
+                "parameters": [
+                    {
+                        "description": "soft-deleted league sessions to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/sessions.BulkDeleteLeagueSessionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_BulkDeleteLeagueSessionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "409001 CONFLICT (a team entered another session while the batch ran; retry)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sessions/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Get a league session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "league session id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "404001 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Soft delete: the session is hidden from every read and stops being active. Its divisions, teams and matches are kept. Remove it for good with DELETE /sessions/{id}/permanent.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Delete a league session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "league session id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "deleted"
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "404001 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Partial update: an absent field is left unchanged, and an empty body is rejected. The create rules apply to the merged result, so moving only `ends_on` before the existing `starts_on` fails. `is_active: true` deactivates the league's other sessions.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Update a league session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "league session id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/sessions.UpdateLeagueSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "404001 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "409001 CONFLICT (duplicate name, or another session made active at the same time)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sessions/{id}/permanent": {
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Only a session already deleted with DELETE /sessions/{id}. Cascades to the session's divisions, the teams created in them, and their matches, including submitted results. Cannot be undone. Refused with 409 while a team created in this session also plays in another session, since the cascade would remove it from that session too.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Permanently delete a league session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "league session id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "permanently deleted"
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "404001 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "409001 CONFLICT (not deleted yet, or a team created here plays in another session)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sessions/{id}/weeks": {
+            "get": {
+                "description": "One row per week that has team matches, ordered by week number. An existing session with no matches returns an empty list.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "List a league session's weeks",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "league session id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_sessions_LeagueSessionWeekResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "404001 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/teams": {
             "get": {
                 "description": "Paged: `limit` rows per page (default 10). Pass `metadata.next_cursor` back as `cursor` for the next page, with the same filters and sort; it is null on the last page. `metadata.total` (rows matching the filters) is sent on the first page only.",
@@ -1485,6 +2061,44 @@
                 }
             }
         },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_sessions_LeagueSessionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/sessions.LeagueSessionResponse"
+                    }
+                },
+                "metadata": {
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_sessions_LeagueSessionWeekResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/sessions.LeagueSessionWeekResponse"
+                    }
+                },
+                "metadata": {
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
+                }
+            }
+        },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-array_teams_RosterPlayerResponse": {
             "type": "object",
             "properties": {
@@ -1560,6 +2174,38 @@
             "properties": {
                 "data": {
                     "$ref": "#/definitions/roles.RoleResponse"
+                },
+                "metadata": {
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_BulkDeleteLeagueSessionsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/sessions.BulkDeleteLeagueSessionsResponse"
+                },
+                "metadata": {
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
+                }
+            }
+        },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/sessions.LeagueSessionResponse"
                 },
                 "metadata": {
                     "description": "lists only; nil for a single item",
@@ -1740,6 +2386,256 @@
                 "name": {
                     "type": "string",
                     "example": "Team Captain"
+                }
+            }
+        },
+        "sessions.BulkDeleteLeagueSessionFailureResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorCode"
+                        }
+                    ],
+                    "example": 404001
+                },
+                "id": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "league session not found"
+                }
+            }
+        },
+        "sessions.BulkDeleteLeagueSessionsRequest": {
+            "type": "object",
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "5e8a2c1d-3b7f-4a90-8c6e-2d1f0b9a7e44"
+                    ]
+                }
+            }
+        },
+        "sessions.BulkDeleteLeagueSessionsResponse": {
+            "type": "object",
+            "properties": {
+                "deleted_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "failed": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/sessions.BulkDeleteLeagueSessionFailureResponse"
+                    }
+                }
+            }
+        },
+        "sessions.CreateLeagueSessionRequest": {
+            "type": "object",
+            "required": [
+                "ends_on",
+                "name",
+                "season_year",
+                "session_type",
+                "starts_on"
+            ],
+            "properties": {
+                "ends_on": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2027-04-30"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "default": false,
+                    "example": false
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "minLength": 3,
+                    "example": "Spring 2027"
+                },
+                "season_year": {
+                    "type": "integer",
+                    "maximum": 2100,
+                    "minimum": 2000,
+                    "example": 2027
+                },
+                "session_type": {
+                    "type": "string",
+                    "enum": [
+                        "SPRING",
+                        "SUMMER",
+                        "FALL"
+                    ],
+                    "example": "SPRING"
+                },
+                "starts_on": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2027-01-10"
+                },
+                "status": {
+                    "type": "string",
+                    "default": "DRAFT",
+                    "enum": [
+                        "DRAFT",
+                        "IN_PROGRESS",
+                        "COMPLETE",
+                        "CANCELLED"
+                    ],
+                    "example": "DRAFT"
+                }
+            }
+        },
+        "sessions.LeagueSessionResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "ends_on": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-12-20"
+                },
+                "has_submitted_results": {
+                    "description": "True when any of the session's team matches has status submitted.",
+                    "type": "boolean",
+                    "example": true
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "league_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Fall 2026"
+                },
+                "season_year": {
+                    "type": "integer",
+                    "example": 2026
+                },
+                "session_type": {
+                    "type": "string",
+                    "enum": [
+                        "SPRING",
+                        "SUMMER",
+                        "FALL"
+                    ],
+                    "example": "FALL"
+                },
+                "starts_on": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-09-01"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "DRAFT",
+                        "IN_PROGRESS",
+                        "COMPLETE",
+                        "CANCELLED"
+                    ],
+                    "example": "IN_PROGRESS"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "week_count": {
+                    "description": "Distinct team_matches.week_no values across the session's divisions.",
+                    "type": "integer",
+                    "example": 10
+                }
+            }
+        },
+        "sessions.LeagueSessionWeekResponse": {
+            "type": "object",
+            "properties": {
+                "first_scheduled_at": {
+                    "type": "string"
+                },
+                "match_count": {
+                    "type": "integer",
+                    "example": 4
+                },
+                "submitted_count": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "week_no": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "sessions.UpdateLeagueSessionRequest": {
+            "type": "object",
+            "properties": {
+                "ends_on": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2027-04-30"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "minLength": 3,
+                    "example": "Spring 2027"
+                },
+                "season_year": {
+                    "type": "integer",
+                    "maximum": 2100,
+                    "minimum": 2000,
+                    "example": 2027
+                },
+                "session_type": {
+                    "type": "string",
+                    "enum": [
+                        "SPRING",
+                        "SUMMER",
+                        "FALL"
+                    ],
+                    "example": "SPRING"
+                },
+                "starts_on": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2027-01-10"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "DRAFT",
+                        "IN_PROGRESS",
+                        "COMPLETE",
+                        "CANCELLED"
+                    ],
+                    "example": "IN_PROGRESS"
                 }
             }
         },

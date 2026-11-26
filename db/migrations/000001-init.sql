@@ -32,8 +32,10 @@ CREATE TABLE IF NOT EXISTS users_sessions (
 	last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Supports logout-everywhere and session-expiry lookups.
-CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON users_sessions (user_id);
+-- One session per user: auth.ReplaceSession upserts with ON CONFLICT (user_id), which
+-- Postgres rejects unless user_id has a unique index. Also serves the logout-everywhere
+-- and session-expiry lookups.
+CREATE UNIQUE INDEX IF NOT EXISTS users_sessions_user_id_key ON users_sessions (user_id);
 
 -- Hierarchy: League -> Season -> Division -> Team -> Roster.
 -- Timezone controls league-local scheduling and season boundaries.
@@ -74,15 +76,22 @@ CREATE TABLE IF NOT EXISTS league_sessions (
 	season_year   SMALLINT  NOT NULL,  -- Explicit because seasons may cross calendar years
 	starts_on   DATE        NOT NULL,
 	ends_on     DATE        NOT NULL,
-	status      TEXT        NOT NULL DEFAULT 'IN_PROGRESS'
+	status      TEXT        NOT NULL DEFAULT 'DRAFT'
 		CHECK (status IN ('DRAFT', 'IN_PROGRESS', 'COMPLETE', 'CANCELLED')),
 	is_active   BOOLEAN     NOT NULL DEFAULT false,
+	-- A soft-deleted session is hidden from every read and never active; its name stays taken.
+	is_deleted  BOOLEAN     NOT NULL DEFAULT false,
 	created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
 
 	UNIQUE (league_id, name),
 	CHECK (ends_on >= starts_on)
 );
+
+-- The API deactivates the league's other sessions in the same transaction first,
+-- so this only fires on a bug or a manual write.
+CREATE UNIQUE INDEX IF NOT EXISTS league_sessions_one_active_per_league
+	ON league_sessions (league_id) WHERE is_active;
 
 CREATE TABLE IF NOT EXISTS divisions (
 	id               UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),

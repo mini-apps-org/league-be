@@ -59,6 +59,7 @@ func (r *Router) NewRouter(ctx context.Context) (*mux.Router, error) {
 	registerAuthRoute(api, authHandler, mw)
 	r.registerRoleRoute(api, mw, permissionService)
 	r.registerTeamRoute(api, mw, permissionService)
+	r.registerLeagueSessionRoute(api, mw)
 
 	return router, nil
 }

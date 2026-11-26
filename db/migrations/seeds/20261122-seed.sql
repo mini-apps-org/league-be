@@ -41,9 +41,23 @@ VALUES ('MVIP League', 'Development league', 'Ho Chi Minh City', 'ops@mvip-leagu
 
 -- Fall 2026 runs Sep -> Dec, so season_year and the dates agree here; a session that
 -- crossed into January would still carry season_year 2026.
-INSERT INTO league_sessions (league_id, name, session_type, season_year, starts_on, ends_on, is_active)
-SELECT l.id, 'Fall 2026', 'FALL', 2026, '2026-09-01', '2026-12-20', true
+INSERT INTO league_sessions (league_id, name, session_type, season_year, starts_on, ends_on, status, is_active)
+SELECT l.id, 'Fall 2026', 'FALL', 2026, '2026-09-01', '2026-12-20', 'IN_PROGRESS', true
 FROM leagues l WHERE l.name = 'MVIP League';
+
+-- The other sessions cover every type and status, so the session list's filters and sorts
+-- have something to show. Only Fall 2026 is active (league_sessions_one_active_per_league),
+-- and only it has divisions and matches.
+INSERT INTO league_sessions (league_id, name, session_type, season_year, starts_on, ends_on, status, is_active)
+SELECT l.id, s.name, s.session_type, s.season_year, s.starts_on, s.ends_on, s.status, false
+FROM leagues l
+CROSS JOIN (VALUES
+	('Fall 2025',   'FALL',   2025, DATE '2025-09-08', DATE '2025-12-14', 'COMPLETE'),
+	('Spring 2026', 'SPRING', 2026, DATE '2026-01-12', DATE '2026-04-26', 'COMPLETE'),
+	('Summer 2026', 'SUMMER', 2026, DATE '2026-05-11', DATE '2026-08-09', 'CANCELLED'),
+	('Spring 2027', 'SPRING', 2027, DATE '2027-01-11', DATE '2027-04-25', 'DRAFT')
+) AS s (name, session_type, season_year, starts_on, ends_on, status)
+WHERE l.name = 'MVIP League';
 
 INSERT INTO divisions (season_id, name, format, skill_level_cap)
 SELECT s.id, '8-Ball Open', '8-ball', 23
