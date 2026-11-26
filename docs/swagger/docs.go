@@ -483,7 +483,7 @@ const docTemplate = `{
         },
         "/sessions": {
             "get": {
-                "description": "Sessions of the league, capped at 200 rows. Not paged: metadata carries count only.",
+                "description": "Paged: ` + "`" + `limit` + "`" + ` rows per page (default 10). Pass ` + "`" + `metadata.next_cursor` + "`" + ` back as ` + "`" + `cursor` + "`" + ` for the next page, with the same filters and sort; it is null on the last page. ` + "`" + `metadata.total` + "`" + ` (rows matching the filters) is sent on the first page only. Soft-deleted sessions are hidden.",
                 "produces": [
                     "application/json"
                 ],
@@ -542,6 +542,18 @@ const docTemplate = `{
                         "default": "-starts_on",
                         "description": "sort order; a leading - sorts descending",
                         "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "rows per page, 1-200 (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "metadata.next_cursor of the previous page",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -691,7 +703,7 @@ const docTemplate = `{
                         "CSRFToken": []
                     }
                 ],
-                "description": "Hard delete. Cascades to the session's divisions, the teams created in them, and their matches, including submitted results. Cannot be undone. Refused with 409 while a team created in this session also plays in another session, since the cascade would remove it from that session too.",
+                "description": "Soft delete: the session is hidden from every read and stops being active. Its divisions, teams and matches are kept. Remove it for good with DELETE /sessions/{id}/permanent.",
                 "produces": [
                     "application/json"
                 ],
@@ -732,12 +744,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "404001 NOT_FOUND",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "409001 CONFLICT (a team created here plays in another session)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }
@@ -812,6 +818,67 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "409001 CONFLICT (duplicate name, or another session made active at the same time)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sessions/{id}/permanent": {
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Only a session already deleted with DELETE /sessions/{id}. Cascades to the session's divisions, the teams created in them, and their matches, including submitted results. Cannot be undone. Refused with 409 while a team created in this session also plays in another session, since the cascade would remove it from that session too.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Permanently delete a league session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "league session id (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "permanently deleted"
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "404001 NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "409001 CONFLICT (not deleted yet, or a team created here plays in another session)",
                         "schema": {
                             "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
                         }

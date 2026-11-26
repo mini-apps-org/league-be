@@ -56,7 +56,6 @@ const (
 	leagueSessionNameMaxLength = 60
 	leagueSessionMinSeasonYear = 2000
 	leagueSessionMaxSeasonYear = 2100
-	leagueSessionListLimit     = 200
 )
 
 // LeagueSession is a league_sessions row plus two values derived from its team matches.
@@ -94,6 +93,7 @@ type ListLeagueSessionsServiceParams struct {
 	SeasonYear  int
 	Status      LeagueSessionStatus
 	Sort        model.SortParams
+	Page        model.CursorParams
 }
 
 type CreateLeagueSessionServiceParams struct {

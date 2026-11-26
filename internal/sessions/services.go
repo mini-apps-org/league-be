@@ -5,21 +5,25 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/nguyentanvinh/league-be/internal/common"
 	"github.com/nguyentanvinh/league-be/internal/platform/handler"
+	"github.com/nguyentanvinh/league-be/internal/platform/model"
 )
 
 const maxSearchQueryLength = 100
 
 type Service interface {
-	ListSessions(ctx context.Context, params ListLeagueSessionsServiceParams) ([]LeagueSession, error)
+	ListSessions(ctx context.Context, params ListLeagueSessionsServiceParams) (*model.CursorResponse[LeagueSession], error)
 	GetSessionByID(ctx context.Context, leagueSessionID string) (*LeagueSession, error)
 	CreateSession(ctx context.Context, params CreateLeagueSessionServiceParams) (*LeagueSession, error)
 	UpdateSessionByID(ctx context.Context, leagueSessionID string, params UpdateLeagueSessionServiceParams) (*LeagueSession, error)
 	DeleteSessionByID(ctx context.Context, leagueSessionID string) error
+	PermanentDeleteSession(ctx context.Context, leagueSessionID string) error
 	ListSessionWeeks(ctx context.Context, leagueSessionID string) ([]LeagueSessionWeek, error)
 }
 
@@ -32,7 +36,7 @@ func NewService(repo Repository, logger *slog.Logger) Service {
 	return &service{repo: repo, logger: logger.With(slog.String("component", "sessions.service"))}
 }
 
-func (s *service) ListSessions(ctx context.Context, params ListLeagueSessionsServiceParams) ([]LeagueSession, error) {
+func (s *service) ListSessions(ctx context.Context, params ListLeagueSessionsServiceParams) (*model.CursorResponse[LeagueSession], error) {
 	params.Query = strings.TrimSpace(params.Query)
 	if utf8.RuneCountInString(params.Query) > maxSearchQueryLength {
 		return nil, handler.ErrorWithMessage(handler.CodeValidationFailed, fmt.Sprintf("q must be at most %d characters", maxSearchQueryLength), nil)
@@ -52,14 +56,33 @@ func (s *service) ListSessions(ctx context.Context, params ListLeagueSessionsSer
 			return nil, err
 		}
 	}
+	if err := normaliseLeagueSessionPage(&params.Page, params.Sort); err != nil {
+		return nil, err
+	}
 
 	leagueID, err := s.resolveSingleLeagueID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	var total *int64
+	if params.Page.After == nil {
+		count, err := s.repo.CountSessions(ctx, leagueID, params)
+		if err != nil {
+			return nil, handler.MapFeatureError(err, leagueSessionErrorMappings)
+		}
+		total = &count
+	}
+
 	sessions, err := s.repo.ListSessions(ctx, leagueID, params)
-	return sessions, handler.MapFeatureError(err, leagueSessionErrorMappings)
+	if err != nil {
+		return nil, handler.MapFeatureError(err, leagueSessionErrorMappings)
+	}
+	page := model.NewCursorResponse(sessions, params.Page.Limit, func(session LeagueSession) model.Cursor {
+		return model.Cursor{Sort: params.Sort.String(), LastValue: leagueSessionSortValue(session, params.Sort.Field), LastID: session.ID}
+	})
+	page.Total = total
+	return page, nil
 }
 
 func (s *service) GetSessionByID(ctx context.Context, leagueSessionID string) (*LeagueSession, error) {
@@ -132,7 +155,17 @@ func (s *service) DeleteSessionByID(ctx context.Context, leagueSessionID string)
 		return err
 	}
 
-	err = s.repo.DeleteSession(ctx, leagueID, leagueSessionID)
+	err = s.repo.SoftDeleteSession(ctx, leagueID, leagueSessionID)
+	return handler.MapFeatureError(err, leagueSessionErrorMappings)
+}
+
+func (s *service) PermanentDeleteSession(ctx context.Context, leagueSessionID string) error {
+	leagueID, err := s.resolveSingleLeagueID(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.PermanentDeleteSession(ctx, leagueID, leagueSessionID)
 	return handler.MapFeatureError(err, leagueSessionErrorMappings)
 }
 
@@ -151,6 +184,47 @@ func (s *service) ListSessionWeeks(ctx context.Context, leagueSessionID string) 
 func (s *service) resolveSingleLeagueID(ctx context.Context) (string, error) {
 	leagueID, err := s.repo.GetDefaultLeagueID(ctx)
 	return leagueID, handler.MapFeatureError(err, leagueSessionErrorMappings)
+}
+
+// normaliseLeagueSessionPage bounds the page and decodes its cursor, then checks the
+// cursor's values parse as the sort column's type. The cursor is client-held, so an edited
+// one must stop at a 400 rather than reach Postgres as a failed cast and a 500.
+func normaliseLeagueSessionPage(page *model.CursorParams, sort model.SortParams) error {
+	if err := page.Normalise(sort); err != nil {
+		return err
+	}
+	if page.After == nil {
+		return nil
+	}
+
+	if err := common.ValidateUUID(page.After.LastID); err != nil {
+		return model.InvalidCursorError()
+	}
+
+	var err error
+	switch sort.Field {
+	case LeagueSessionSortByStartsOn:
+		_, err = time.Parse(time.DateOnly, page.After.LastValue)
+	case LeagueSessionSortBySeasonYear:
+		_, err = strconv.ParseInt(page.After.LastValue, 10, 16)
+	}
+	if err != nil {
+		return model.InvalidCursorError()
+	}
+	return nil
+}
+
+// leagueSessionSortValue is the row's value in the sort column, as a cursor carries it.
+// Keep in step with leagueSessionSortColumn.
+func leagueSessionSortValue(session LeagueSession, field string) string {
+	switch field {
+	case LeagueSessionSortByName:
+		return session.Name
+	case LeagueSessionSortBySeasonYear:
+		return strconv.Itoa(int(session.SeasonYear))
+	default:
+		return session.StartsOn.Format(time.DateOnly)
+	}
 }
 
 // leagueSessionFields is every validated field of a session, whether it comes from a

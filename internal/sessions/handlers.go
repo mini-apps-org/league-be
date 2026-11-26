@@ -21,7 +21,7 @@ func NewHandler(cfg *config.Config, service Service) Handler {
 }
 
 // @Summary		List league sessions
-// @Description	Sessions of the league, capped at 200 rows. Not paged: metadata carries count only.
+// @Description	Paged: `limit` rows per page (default 10). Pass `metadata.next_cursor` back as `cursor` for the next page, with the same filters and sort; it is null on the last page. `metadata.total` (rows matching the filters) is sent on the first page only. Soft-deleted sessions are hidden.
 // @Tags			sessions
 // @Produce		json
 // @Param			q				query		string	false	"case-insensitive match on name"
@@ -29,6 +29,8 @@ func NewHandler(cfg *config.Config, service Service) Handler {
 // @Param			season_year		query		int		false	"season year"								minimum(2000)	maximum(2100)
 // @Param			status			query		string	false	"status"									Enums(DRAFT, IN_PROGRESS, COMPLETE, CANCELLED)
 // @Param			sort			query		string	false	"sort order; a leading - sorts descending"	Enums(name, -name, starts_on, -starts_on, season_year, -season_year)	default(-starts_on)
+// @Param			limit			query		int		false	"rows per page, 1-200 (default 10)"
+// @Param			cursor			query		string	false	"metadata.next_cursor of the previous page"
 // @Success		200				{object}	handler.SuccessResponse[[]sessions.LeagueSessionResponse]
 // @Failure		400				{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
 // @Failure		401				{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
@@ -47,27 +49,33 @@ func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 		h.ReturnWithError(w, r, err)
 		return
 	}
+	limit, err := model.ParseLimit(query.Get("limit"))
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
 
-	sessions, err := h.service.ListSessions(r.Context(), ListLeagueSessionsServiceParams{
+	page, err := h.service.ListSessions(r.Context(), ListLeagueSessionsServiceParams{
 		Query:       query.Get("q"),
 		SessionType: LeagueSessionType(query.Get("session_type")),
 		SeasonYear:  seasonYear,
 		Status:      LeagueSessionStatus(query.Get("status")),
 		Sort:        sort,
+		Page:        model.CursorParams{Limit: limit, Cursor: query.Get("cursor")},
 	})
 	if err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}
 
-	items := make([]LeagueSessionResponse, 0, len(sessions))
-	for _, session := range sessions {
+	items := make([]LeagueSessionResponse, 0, len(page.Items))
+	for _, session := range page.Items {
 		items = append(items, newLeagueSessionResponse(session))
 	}
 
 	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[[]LeagueSessionResponse]{
 		Data:     items,
-		Metadata: handler.NewMetadata(len(items)),
+		Metadata: handler.NewPageMetadata(len(items), page.Total, page.NextCursor),
 	})
 }
 
@@ -208,7 +216,7 @@ func (h *Handler) UpdateSessionByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // @Summary		Delete a league session
-// @Description	Hard delete. Cascades to the session's divisions, the teams created in them, and their matches, including submitted results. Cannot be undone. Refused with 409 while a team created in this session also plays in another session, since the cascade would remove it from that session too.
+// @Description	Soft delete: the session is hidden from every read and stops being active. Its divisions, teams and matches are kept. Remove it for good with DELETE /sessions/{id}/permanent.
 // @Tags			sessions
 // @Produce		json
 // @Param			id	path	string	true	"league session id (uuid)"
@@ -217,7 +225,6 @@ func (h *Handler) UpdateSessionByID(w http.ResponseWriter, r *http.Request) {
 // @Failure		401	{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
 // @Failure		403	{object}	handler.ErrorResponse	"403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED"
 // @Failure		404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
-// @Failure		409	{object}	handler.ErrorResponse	"409001 CONFLICT (a team created here plays in another session)"
 // @Security		CSRFToken
 // @Router			/sessions/{id} [delete]
 func (h *Handler) DeleteSessionByID(w http.ResponseWriter, r *http.Request) {
@@ -228,6 +235,34 @@ func (h *Handler) DeleteSessionByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.DeleteSessionByID(r.Context(), id); err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	h.ReturnWithJSON(w, http.StatusNoContent, nil)
+}
+
+// @Summary		Permanently delete a league session
+// @Description	Only a session already deleted with DELETE /sessions/{id}. Cascades to the session's divisions, the teams created in them, and their matches, including submitted results. Cannot be undone. Refused with 409 while a team created in this session also plays in another session, since the cascade would remove it from that session too.
+// @Tags			sessions
+// @Produce		json
+// @Param			id	path	string	true	"league session id (uuid)"
+// @Success		204	"permanently deleted"
+// @Failure		400	{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED"
+// @Failure		401	{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
+// @Failure		403	{object}	handler.ErrorResponse	"403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED"
+// @Failure		404	{object}	handler.ErrorResponse	"404001 NOT_FOUND"
+// @Failure		409	{object}	handler.ErrorResponse	"409001 CONFLICT (not deleted yet, or a team created here plays in another session)"
+// @Security		CSRFToken
+// @Router			/sessions/{id}/permanent [delete]
+func (h *Handler) PermanentDeleteSession(w http.ResponseWriter, r *http.Request) {
+	id, err := handler.ParsePathUUID(r, "id")
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	if err := h.service.PermanentDeleteSession(r.Context(), id); err != nil {
 		h.ReturnWithError(w, r, err)
 		return
 	}

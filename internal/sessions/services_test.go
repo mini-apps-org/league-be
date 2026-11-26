@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/nguyentanvinh/league-be/internal/platform/handler"
+	"github.com/nguyentanvinh/league-be/internal/platform/model"
 )
 
 const (
@@ -29,7 +30,21 @@ type fakeRepository struct {
 	writeErr         error
 	created          *CreateLeagueSessionServiceParams
 	updated          *UpdateLeagueSessionServiceParams
-	deleted          bool
+	softDeleted      bool
+	permanentDeleted bool
+	listed           []LeagueSession
+	listedParams     *ListLeagueSessionsServiceParams
+	counted          bool
+}
+
+func (f *fakeRepository) ListSessions(_ context.Context, _ string, params ListLeagueSessionsServiceParams) ([]LeagueSession, error) {
+	f.listedParams = &params
+	return f.listed, nil
+}
+
+func (f *fakeRepository) CountSessions(context.Context, string, ListLeagueSessionsServiceParams) (int64, error) {
+	f.counted = true
+	return int64(len(f.listed)), nil
 }
 
 func (f *fakeRepository) GetDefaultLeagueID(context.Context) (string, error) {
@@ -71,11 +86,19 @@ func (f *fakeRepository) UpdateSession(_ context.Context, _, id string, params U
 	return &LeagueSession{ID: id}, nil
 }
 
-func (f *fakeRepository) DeleteSession(context.Context, string, string) error {
+func (f *fakeRepository) SoftDeleteSession(context.Context, string, string) error {
 	if f.writeErr != nil {
 		return f.writeErr
 	}
-	f.deleted = true
+	f.softDeleted = true
+	return nil
+}
+
+func (f *fakeRepository) PermanentDeleteSession(context.Context, string, string) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
+	f.permanentDeleted = true
 	return nil
 }
 
@@ -240,6 +263,7 @@ func TestLeagueSessionErrorMapping(t *testing.T) {
 		wantStatus int
 	}{
 		{ErrLeagueSessionNotFound, handler.CodeNotFound, 404},
+		{ErrLeagueSessionNotSoftDeleted, handler.CodeConflict, 409},
 		{ErrDuplicateLeagueSessionName, handler.CodeConflict, 409},
 		{ErrInvalidLeagueSession, handler.CodeValidationFailed, 400},
 		{ErrLeagueSessionActiveConflict, handler.CodeConflict, 409},
@@ -251,7 +275,7 @@ func TestLeagueSessionErrorMapping(t *testing.T) {
 		t.Run(tt.sentinel.Error(), func(t *testing.T) {
 			repo := &fakeRepository{writeErr: fmt.Errorf("wrapped: %w", tt.sentinel)}
 
-			err := NewService(repo, testLogger).DeleteSessionByID(context.Background(), testLeagueSessionID)
+			err := NewService(repo, testLogger).PermanentDeleteSession(context.Background(), testLeagueSessionID)
 
 			apiErr := handler.AsAPIError(err)
 			if apiErr.Code != tt.wantCode || apiErr.Status() != tt.wantStatus {
@@ -299,6 +323,126 @@ func TestConstraintErrorMapsByName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := constraintError(tt.err); !errors.Is(got, tt.wantTarget) || (tt.wantTarget == nil && got != nil) {
 				t.Errorf("constraintError = %v, want %v", got, tt.wantTarget)
+			}
+		})
+	}
+}
+
+// The two deletes must reach different repository calls: DELETE /sessions/{id} wired to the
+// permanent delete would cascade a session's divisions, teams and results on the first click.
+func TestDeleteLeagueSessionRoutesToTheRightDelete(t *testing.T) {
+	repo := &fakeRepository{}
+	service := NewService(repo, testLogger)
+
+	if err := service.DeleteSessionByID(context.Background(), testLeagueSessionID); err != nil {
+		t.Fatal(err)
+	}
+	if !repo.softDeleted || repo.permanentDeleted {
+		t.Fatalf("soft delete: soft = %v, permanent = %v", repo.softDeleted, repo.permanentDeleted)
+	}
+
+	repo = &fakeRepository{}
+	if err := NewService(repo, testLogger).PermanentDeleteSession(context.Background(), testLeagueSessionID); err != nil {
+		t.Fatal(err)
+	}
+	if repo.softDeleted || !repo.permanentDeleted {
+		t.Errorf("permanent delete: soft = %v, permanent = %v", repo.softDeleted, repo.permanentDeleted)
+	}
+}
+
+func testLeagueSessions(count int) []LeagueSession {
+	sessions := make([]LeagueSession, 0, count)
+	for i := range count {
+		sessions = append(sessions, LeagueSession{
+			ID:         fmt.Sprintf("00000000-0000-4000-8000-%012d", i+10),
+			Name:       fmt.Sprintf("Session %02d", i),
+			SeasonYear: int16(2020 + i),
+			StartsOn:   testDate("2026-01-01").AddDate(0, 0, -i),
+		})
+	}
+	return sessions
+}
+
+// The repository returns limit+1 rows as a lookahead. The page must drop it and point the
+// cursor at the last row kept, or the client skips a session between pages.
+func TestListLeagueSessionsPages(t *testing.T) {
+	sort := defaultLeagueSessionSort
+	repo := &fakeRepository{listed: testLeagueSessions(3)}
+
+	page, err := NewService(repo, testLogger).ListSessions(context.Background(), ListLeagueSessionsServiceParams{
+		Sort: sort,
+		Page: model.CursorParams{Limit: 2},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(page.Items) != 2 || page.NextCursor == nil {
+		t.Fatalf("items = %d, next = %v; want 2 items and a next cursor", len(page.Items), page.NextCursor)
+	}
+	if page.Total == nil || !repo.counted {
+		t.Error("first page has no total")
+	}
+	next, err := model.DecodeCursor(*page.NextCursor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.LastID != page.Items[1].ID || next.LastValue != "2025-12-31" || next.Sort != "-starts_on" {
+		t.Errorf("next cursor = %+v, want after %s at 2025-12-31 under -starts_on", next, page.Items[1].ID)
+	}
+
+	repo = &fakeRepository{listed: testLeagueSessions(1)}
+	page, err = NewService(repo, testLogger).ListSessions(context.Background(), ListLeagueSessionsServiceParams{
+		Sort: sort,
+		Page: model.CursorParams{Limit: 2, Cursor: model.EncodeCursor(*next)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repo.counted || page.Total != nil {
+		t.Error("a later page counted again: total is first-page only")
+	}
+	if page.NextCursor != nil {
+		t.Errorf("last page has a next cursor %q", *page.NextCursor)
+	}
+}
+
+// The cursor is client-held. An edited value must be a 400 here, not a failed ::date or
+// ::uuid cast in Postgres served as a 500.
+func TestListLeagueSessionsRejectsBadCursor(t *testing.T) {
+	validID := "00000000-0000-4000-8000-000000000010"
+	byStartsOn := defaultLeagueSessionSort
+	byYear := model.SortParams{Field: LeagueSessionSortBySeasonYear}
+	byName := model.SortParams{Field: LeagueSessionSortByName}
+
+	tests := []struct {
+		name     string
+		sort     model.SortParams
+		cursor   model.Cursor
+		wantCode handler.ErrorCode
+	}{
+		{"valid date", byStartsOn, model.Cursor{Sort: byStartsOn.String(), LastValue: "2026-09-01", LastID: validID}, 0},
+		{"timestamp for a date column", byStartsOn, model.Cursor{Sort: byStartsOn.String(), LastValue: "2026-09-01T00:00:00Z", LastID: validID}, handler.CodeValidationFailed},
+		{"valid year", byYear, model.Cursor{Sort: byYear.String(), LastValue: "2026", LastID: validID}, 0},
+		{"year past smallint", byYear, model.Cursor{Sort: byYear.String(), LastValue: "70000", LastID: validID}, handler.CodeValidationFailed},
+		{"any name", byName, model.Cursor{Sort: byName.String(), LastValue: "x' OR 1=1 --", LastID: validID}, 0},
+		{"id not a uuid", byName, model.Cursor{Sort: byName.String(), LastValue: "Fall", LastID: "42"}, handler.CodeValidationFailed},
+		{"cursor from another sort", byName, model.Cursor{Sort: byStartsOn.String(), LastValue: "2026-09-01", LastID: validID}, handler.CodeValidationFailed},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{}
+			_, err := NewService(repo, testLogger).ListSessions(context.Background(), ListLeagueSessionsServiceParams{
+				Sort: tt.sort,
+				Page: model.CursorParams{Cursor: model.EncodeCursor(tt.cursor)},
+			})
+
+			if got := errorCode(err); got != tt.wantCode {
+				t.Fatalf("code = %d, want %d (err: %v)", got, tt.wantCode, err)
+			}
+			if reached := repo.listedParams != nil; reached != (tt.wantCode == 0) {
+				t.Errorf("repository reached = %v, want %v", reached, tt.wantCode == 0)
 			}
 		})
 	}

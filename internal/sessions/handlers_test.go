@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/nguyentanvinh/league-be/internal/platform/handler"
@@ -38,8 +39,8 @@ func TestParseLeagueSessionSort(t *testing.T) {
 				t.Errorf("sort = %+v, want %s desc=%v", sort, tt.wantField, tt.wantDesc)
 			}
 			if err == nil {
-				if _, ok := leagueSessionSortColumns[sort.Field]; !ok {
-					t.Errorf("sort field %q has no ORDER BY column: the list would 500", sort.Field)
+				if column, _ := leagueSessionSortColumn(sort.Field); !strings.HasSuffix(column, "."+sort.Field) {
+					t.Errorf("sort field %q orders by %s: the default branch swallowed it", sort.Field, column)
 				}
 			}
 		})

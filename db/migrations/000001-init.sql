@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS league_sessions (
 	status      TEXT        NOT NULL DEFAULT 'IN_PROGRESS'
 		CHECK (status IN ('DRAFT', 'IN_PROGRESS', 'COMPLETE', 'CANCELLED')),
 	is_active   BOOLEAN     NOT NULL DEFAULT false,
+	-- A soft-deleted session is hidden from every read and never active; its name stays taken.
+	is_deleted  BOOLEAN     NOT NULL DEFAULT false,
 	created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
 

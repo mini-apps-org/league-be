@@ -24,5 +24,6 @@ func (r *Router) registerLeagueSessionRoute(api *mux.Router, mw middleware.Middl
 	api.Handle("/sessions/{id}", guard(config.PermissionFeatureSessions, sessionHandler.GetSessionByID)).Methods(http.MethodGet)
 	api.Handle("/sessions/{id}", guard(config.PermissionFeatureSessions, sessionHandler.UpdateSessionByID)).Methods(http.MethodPatch)
 	api.Handle("/sessions/{id}", guard(config.PermissionFeatureSessions, sessionHandler.DeleteSessionByID)).Methods(http.MethodDelete)
+	api.Handle("/sessions/{id}/permanent", guard(config.PermissionFeatureSessions, sessionHandler.PermanentDeleteSession)).Methods(http.MethodDelete)
 	api.Handle("/sessions/{id}/weeks", guard(config.PermissionFeatureSessions, sessionHandler.ListSessionWeeks)).Methods(http.MethodGet)
 }
