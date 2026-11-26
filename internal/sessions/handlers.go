@@ -270,6 +270,63 @@ func (h *Handler) PermanentDeleteSession(w http.ResponseWriter, r *http.Request)
 	h.ReturnWithJSON(w, http.StatusNoContent, nil)
 }
 
+// @Summary		Soft-delete several league sessions
+// @Description	Best effort, in one statement: every live session in `ids` is soft-deleted, as DELETE /sessions/{id} does. A session that cannot be deleted is listed in `failed` with the code and message the single delete returns (404001 missing or already deleted); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.
+// @Tags			sessions
+// @Accept			json
+// @Produce		json
+// @Param			body	body		sessions.BulkDeleteLeagueSessionsRequest	true	"league sessions to soft-delete"
+// @Success		200		{object}	handler.SuccessResponse[sessions.BulkDeleteLeagueSessionsResponse]
+// @Failure		400		{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)"
+// @Failure		401		{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
+// @Failure		403		{object}	handler.ErrorResponse	"403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED"
+// @Security		CSRFToken
+// @Router			/sessions [delete]
+func (h *Handler) BulkSoftDeleteSessions(w http.ResponseWriter, r *http.Request) {
+	var body BulkDeleteLeagueSessionsRequest
+	if err := h.DecodeJSON(w, r, &body); err != nil {
+		h.ReturnWithError(w, r, handler.InvalidJSONBodyError(err))
+		return
+	}
+
+	result, err := h.service.BulkSoftDeleteSessions(r.Context(), body.IDs)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[BulkDeleteLeagueSessionsResponse]{Data: newBulkDeleteLeagueSessionsResponse(*result)})
+}
+
+// @Summary		Permanently delete several league sessions
+// @Description	Best effort, in one transaction: every session in `ids` that is soft-deleted and homes no team playing in another session is removed, as DELETE /sessions/{id}/permanent does, cascade included. A session that cannot be deleted is listed in `failed` (404001 missing, 409001 not deleted yet or a team created there plays in another session); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored. Cannot be undone.
+// @Tags			sessions
+// @Accept			json
+// @Produce		json
+// @Param			body	body		sessions.BulkDeleteLeagueSessionsRequest	true	"soft-deleted league sessions to remove"
+// @Success		200		{object}	handler.SuccessResponse[sessions.BulkDeleteLeagueSessionsResponse]
+// @Failure		400		{object}	handler.ErrorResponse	"400001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)"
+// @Failure		401		{object}	handler.ErrorResponse	"401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID"
+// @Failure		403		{object}	handler.ErrorResponse	"403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED"
+// @Failure		409		{object}	handler.ErrorResponse	"409001 CONFLICT (a team entered another session while the batch ran; retry)"
+// @Security		CSRFToken
+// @Router			/sessions/permanent [delete]
+func (h *Handler) BulkPermanentDeleteSessions(w http.ResponseWriter, r *http.Request) {
+	var body BulkDeleteLeagueSessionsRequest
+	if err := h.DecodeJSON(w, r, &body); err != nil {
+		h.ReturnWithError(w, r, handler.InvalidJSONBodyError(err))
+		return
+	}
+
+	result, err := h.service.BulkPermanentDeleteSessions(r.Context(), body.IDs)
+	if err != nil {
+		h.ReturnWithError(w, r, err)
+		return
+	}
+
+	h.ReturnWithJSON(w, http.StatusOK, handler.SuccessResponse[BulkDeleteLeagueSessionsResponse]{Data: newBulkDeleteLeagueSessionsResponse(*result)})
+}
+
 // @Summary		List a league session's weeks
 // @Description	One row per week that has team matches, ordered by week number. An existing session with no matches returns an empty list.
 // @Tags			sessions

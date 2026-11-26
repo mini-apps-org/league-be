@@ -116,3 +116,17 @@ type UpdateLeagueSessionServiceParams struct {
 	Status      *LeagueSessionStatus
 	IsActive    *bool
 }
+
+// BulkDeleteLeagueSessionsResult is the outcome of a best-effort bulk delete: every
+// requested session is in exactly one of DeletedIDs and Failures.
+type BulkDeleteLeagueSessionsResult struct {
+	DeletedIDs []string
+	Failures   []BulkDeleteLeagueSessionFailure
+}
+
+// BulkDeleteLeagueSessionFailure is one session a bulk delete could not delete. Err is what
+// the single delete would have returned for it.
+type BulkDeleteLeagueSessionFailure struct {
+	LeagueSessionID string
+	Err             error
+}

@@ -644,6 +644,124 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Best effort, in one statement: every live session in ` + "`" + `ids` + "`" + ` is soft-deleted, as DELETE /sessions/{id} does. A session that cannot be deleted is listed in ` + "`" + `failed` + "`" + ` with the code and message the single delete returns (404001 missing or already deleted); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Soft-delete several league sessions",
+                "parameters": [
+                    {
+                        "description": "league sessions to soft-delete",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/sessions.BulkDeleteLeagueSessionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_BulkDeleteLeagueSessionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sessions/permanent": {
+            "delete": {
+                "security": [
+                    {
+                        "CSRFToken": []
+                    }
+                ],
+                "description": "Best effort, in one transaction: every session in ` + "`" + `ids` + "`" + ` that is soft-deleted and homes no team playing in another session is removed, as DELETE /sessions/{id}/permanent does, cascade included. A session that cannot be deleted is listed in ` + "`" + `failed` + "`" + ` (404001 missing, 409001 not deleted yet or a team created there plays in another session); the others are still deleted. Always 200 once the request itself is valid. 1-100 ids; repeats are ignored. Cannot be undone.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sessions"
+                ],
+                "summary": "Permanently delete several league sessions",
+                "parameters": [
+                    {
+                        "description": "soft-deleted league sessions to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/sessions.BulkDeleteLeagueSessionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_BulkDeleteLeagueSessionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "400001 VALIDATION_FAILED (no ids, more than 100, or one is not a uuid)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005 PERMISSION_DENIED",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "409001 CONFLICT (a team entered another session while the batch ran; retry)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/sessions/{id}": {
@@ -2074,6 +2192,22 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_BulkDeleteLeagueSessionsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/sessions.BulkDeleteLeagueSessionsResponse"
+                },
+                "metadata": {
+                    "description": "lists only; nil for a single item",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata"
+                        }
+                    ]
+                }
+            }
+        },
         "github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse": {
             "type": "object",
             "properties": {
@@ -2259,6 +2393,57 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "Team Captain"
+                }
+            }
+        },
+        "sessions.BulkDeleteLeagueSessionFailureResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorCode"
+                        }
+                    ],
+                    "example": 404001
+                },
+                "id": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "league session not found"
+                }
+            }
+        },
+        "sessions.BulkDeleteLeagueSessionsRequest": {
+            "type": "object",
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "5e8a2c1d-3b7f-4a90-8c6e-2d1f0b9a7e44"
+                    ]
+                }
+            }
+        },
+        "sessions.BulkDeleteLeagueSessionsResponse": {
+            "type": "object",
+            "properties": {
+                "deleted_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "failed": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/sessions.BulkDeleteLeagueSessionFailureResponse"
+                    }
                 }
             }
         },

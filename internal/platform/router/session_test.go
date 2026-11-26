@@ -43,6 +43,9 @@ func TestLeagueSessionRoutesRequirePermissionForMethod(t *testing.T) {
 		{http.MethodGet, "/sessions/not-a-uuid", "", "session.read"},
 		{http.MethodPatch, "/sessions/not-a-uuid", "{}", "session.update"},
 		{http.MethodDelete, "/sessions/not-a-uuid", "", "session.delete"},
+		{http.MethodDelete, "/sessions/not-a-uuid/permanent", "", "session.delete"},
+		{http.MethodDelete, "/sessions", `{"ids": []}`, "session.delete"},
+		{http.MethodDelete, "/sessions/permanent", `{"ids": []}`, "session.delete"},
 		{http.MethodGet, "/sessions/not-a-uuid/weeks", "", "session.read"},
 	}
 	allSessionCodes := []string{"session.read", "session.create", "session.update", "session.delete"}
@@ -80,4 +83,24 @@ func serveLeagueSessionRoute(t *testing.T, permissions grantedPermissions, metho
 	var response handler.ErrorResponse
 	_ = json.Unmarshal(recorder.Body.Bytes(), &response)
 	return recorder.Code, response.Error.Code
+}
+
+// Same trap as the teams routes: registered after /sessions/{id}, DELETE /sessions/permanent
+// would reach the single delete with id "permanent" and answer "id must be a uuid".
+func TestBulkSessionDeleteRoutesReachBulkHandlers(t *testing.T) {
+	router := &Router{Config: &config.Config{}, Logger: slog.New(slog.DiscardHandler)}
+	api := mux.NewRouter().PathPrefix(PrefixAPIV1).Subrouter()
+	router.registerLeagueSessionRoute(api, passThroughMiddleware{})
+
+	for _, path := range []string{"/sessions", "/sessions/permanent"} {
+		t.Run(path, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodDelete, PrefixAPIV1+path, strings.NewReader(`{"ids": []}`))
+			recorder := httptest.NewRecorder()
+			api.ServeHTTP(recorder, request)
+
+			if body := recorder.Body.String(); !strings.Contains(body, "ids must hold at least one league session id") {
+				t.Errorf("DELETE %s reached the wrong handler: %d %s", path, recorder.Code, body)
+			}
+		})
+	}
 }

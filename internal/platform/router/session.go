@@ -21,6 +21,9 @@ func (r *Router) registerLeagueSessionRoute(api *mux.Router, mw middleware.Middl
 
 	api.Handle("/sessions", guard(config.PermissionFeatureSessions, sessionHandler.ListSessions)).Methods(http.MethodGet)
 	api.Handle("/sessions", guard(config.PermissionFeatureSessions, sessionHandler.CreateSession)).Methods(http.MethodPost)
+	// Before /sessions/{id}: mux tries routes in order, and {id} would match "permanent".
+	api.Handle("/sessions", guard(config.PermissionFeatureSessions, sessionHandler.BulkSoftDeleteSessions)).Methods(http.MethodDelete)
+	api.Handle("/sessions/permanent", guard(config.PermissionFeatureSessions, sessionHandler.BulkPermanentDeleteSessions)).Methods(http.MethodDelete)
 	api.Handle("/sessions/{id}", guard(config.PermissionFeatureSessions, sessionHandler.GetSessionByID)).Methods(http.MethodGet)
 	api.Handle("/sessions/{id}", guard(config.PermissionFeatureSessions, sessionHandler.UpdateSessionByID)).Methods(http.MethodPatch)
 	api.Handle("/sessions/{id}", guard(config.PermissionFeatureSessions, sessionHandler.DeleteSessionByID)).Methods(http.MethodDelete)

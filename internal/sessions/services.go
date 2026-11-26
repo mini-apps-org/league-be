@@ -15,7 +15,10 @@ import (
 	"github.com/nguyentanvinh/league-be/internal/platform/model"
 )
 
-const maxSearchQueryLength = 100
+const (
+	maxSearchQueryLength    = 100
+	maxBulkLeagueSessionIDs = 100
+)
 
 type Service interface {
 	ListSessions(ctx context.Context, params ListLeagueSessionsServiceParams) (*model.CursorResponse[LeagueSession], error)
@@ -24,6 +27,8 @@ type Service interface {
 	UpdateSessionByID(ctx context.Context, leagueSessionID string, params UpdateLeagueSessionServiceParams) (*LeagueSession, error)
 	DeleteSessionByID(ctx context.Context, leagueSessionID string) error
 	PermanentDeleteSession(ctx context.Context, leagueSessionID string) error
+	BulkSoftDeleteSessions(ctx context.Context, ids []string) (*BulkDeleteLeagueSessionsResult, error)
+	BulkPermanentDeleteSessions(ctx context.Context, ids []string) (*BulkDeleteLeagueSessionsResult, error)
 	ListSessionWeeks(ctx context.Context, leagueSessionID string) ([]LeagueSessionWeek, error)
 }
 
@@ -167,6 +172,85 @@ func (s *service) PermanentDeleteSession(ctx context.Context, leagueSessionID st
 
 	err = s.repo.PermanentDeleteSession(ctx, leagueID, leagueSessionID)
 	return handler.MapFeatureError(err, leagueSessionErrorMappings)
+}
+
+// BulkSoftDeleteSessions soft-deletes the sessions in one statement, best effort: a session
+// that cannot be deleted is reported with the error DeleteSessionByID would return, and
+// the rest still are.
+func (s *service) BulkSoftDeleteSessions(ctx context.Context, ids []string) (*BulkDeleteLeagueSessionsResult, error) {
+	ids, err := normaliseBulkLeagueSessionIDs(ids)
+	if err != nil {
+		return nil, err
+	}
+	leagueID, err := s.resolveSingleLeagueID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.repo.BulkSoftDeleteSessions(ctx, leagueID, ids)
+	if err != nil {
+		return nil, handler.MapFeatureError(err, leagueSessionErrorMappings)
+	}
+	return withLeagueSessionAPIErrors(result), nil
+}
+
+// BulkPermanentDeleteSessions permanently deletes the soft-deleted sessions that home no
+// shared team, best effort, each failure being the error PermanentDeleteSession would
+// return.
+func (s *service) BulkPermanentDeleteSessions(ctx context.Context, ids []string) (*BulkDeleteLeagueSessionsResult, error) {
+	ids, err := normaliseBulkLeagueSessionIDs(ids)
+	if err != nil {
+		return nil, err
+	}
+	leagueID, err := s.resolveSingleLeagueID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.repo.BulkPermanentDeleteSessions(ctx, leagueID, ids)
+	if err != nil {
+		return nil, handler.MapFeatureError(err, leagueSessionErrorMappings)
+	}
+	return withLeagueSessionAPIErrors(result), nil
+}
+
+// withLeagueSessionAPIErrors turns each failure's repository sentinel into the API error
+// the single delete serves for it.
+func withLeagueSessionAPIErrors(result *BulkDeleteLeagueSessionsResult) *BulkDeleteLeagueSessionsResult {
+	for i := range result.Failures {
+		result.Failures[i].Err = handler.MapFeatureError(result.Failures[i].Err, leagueSessionErrorMappings)
+	}
+	return result
+}
+
+// normaliseBulkLeagueSessionIDs rejects a malformed request as a whole — that is a client
+// bug, not one session's outcome — puts each id in canonical form, and drops repeated ids,
+// keeping their first position.
+func normaliseBulkLeagueSessionIDs(ids []string) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, handler.ErrorWithMessage(handler.CodeValidationFailed, "ids must hold at least one league session id", nil)
+	}
+
+	unique := make([]string, 0, len(ids))
+	seen := make(map[string]bool, len(ids))
+	for i, raw := range ids {
+		// Canonical, so a repeat in another case is dropped and each id matches the form the
+		// delete statements return.
+		id, err := common.NormaliseUUID(raw)
+		if err != nil {
+			return nil, handler.ErrorWithMessage(handler.CodeValidationFailed, fmt.Sprintf("ids[%d] must be a uuid", i), nil)
+		}
+		if !seen[id] {
+			seen[id] = true
+			unique = append(unique, id)
+		}
+	}
+
+	if len(unique) > maxBulkLeagueSessionIDs {
+		return nil, handler.ErrorWithMessage(handler.CodeValidationFailed,
+			fmt.Sprintf("ids must hold at most %d league sessions", maxBulkLeagueSessionIDs), nil)
+	}
+	return unique, nil
 }
 
 func (s *service) ListSessionWeeks(ctx context.Context, leagueSessionID string) ([]LeagueSessionWeek, error) {

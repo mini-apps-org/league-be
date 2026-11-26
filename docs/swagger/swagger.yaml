@@ -182,6 +182,15 @@ definitions:
         - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
         description: lists only; nil for a single item
     type: object
+  github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_BulkDeleteLeagueSessionsResponse:
+    properties:
+      data:
+        $ref: '#/definitions/sessions.BulkDeleteLeagueSessionsResponse'
+      metadata:
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.Metadata'
+        description: lists only; nil for a single item
+    type: object
   github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_LeagueSessionResponse:
     properties:
       data:
@@ -299,6 +308,38 @@ definitions:
       name:
         example: Team Captain
         type: string
+    type: object
+  sessions.BulkDeleteLeagueSessionFailureResponse:
+    properties:
+      code:
+        allOf:
+        - $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorCode'
+        example: 404001
+      id:
+        type: string
+      message:
+        example: league session not found
+        type: string
+    type: object
+  sessions.BulkDeleteLeagueSessionsRequest:
+    properties:
+      ids:
+        example:
+        - 5e8a2c1d-3b7f-4a90-8c6e-2d1f0b9a7e44
+        items:
+          type: string
+        type: array
+    type: object
+  sessions.BulkDeleteLeagueSessionsResponse:
+    properties:
+      deleted_ids:
+        items:
+          type: string
+        type: array
+      failed:
+        items:
+          $ref: '#/definitions/sessions.BulkDeleteLeagueSessionFailureResponse'
+        type: array
     type: object
   sessions.CreateLeagueSessionRequest:
     properties:
@@ -906,6 +947,47 @@ paths:
       tags:
       - roles
   /sessions:
+    delete:
+      consumes:
+      - application/json
+      description: 'Best effort, in one statement: every live session in `ids` is
+        soft-deleted, as DELETE /sessions/{id} does. A session that cannot be deleted
+        is listed in `failed` with the code and message the single delete returns
+        (404001 missing or already deleted); the others are still deleted. Always
+        200 once the request itself is valid. 1-100 ids; repeats are ignored.'
+      parameters:
+      - description: league sessions to soft-delete
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/sessions.BulkDeleteLeagueSessionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_BulkDeleteLeagueSessionsResponse'
+        "400":
+          description: 400001 VALIDATION_FAILED (no ids, more than 100, or one is
+            not a uuid)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "401":
+          description: 401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005
+            PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Soft-delete several league sessions
+      tags:
+      - sessions
     get:
       description: 'Paged: `limit` rows per page (default 10). Pass `metadata.next_cursor`
         back as `cursor` for the next page, with the same filters and sort; it is
@@ -1228,6 +1310,55 @@ paths:
           schema:
             $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
       summary: List a league session's weeks
+      tags:
+      - sessions
+  /sessions/permanent:
+    delete:
+      consumes:
+      - application/json
+      description: 'Best effort, in one transaction: every session in `ids` that is
+        soft-deleted and homes no team playing in another session is removed, as DELETE
+        /sessions/{id}/permanent does, cascade included. A session that cannot be
+        deleted is listed in `failed` (404001 missing, 409001 not deleted yet or a
+        team created there plays in another session); the others are still deleted.
+        Always 200 once the request itself is valid. 1-100 ids; repeats are ignored.
+        Cannot be undone.'
+      parameters:
+      - description: soft-deleted league sessions to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/sessions.BulkDeleteLeagueSessionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.SuccessResponse-sessions_BulkDeleteLeagueSessionsResponse'
+        "400":
+          description: 400001 VALIDATION_FAILED (no ids, more than 100, or one is
+            not a uuid)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "401":
+          description: 401001 SESSION_COOKIE_ABSENT | 401002 SESSION_INVALID
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "403":
+          description: 403001 CSRF_COOKIE_ABSENT | 403002 CSRF_TOKEN_MISMATCH | 403005
+            PERMISSION_DENIED
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+        "409":
+          description: 409001 CONFLICT (a team entered another session while the batch
+            ran; retry)
+          schema:
+            $ref: '#/definitions/github_com_nguyentanvinh_league-be_internal_platform_handler.ErrorResponse'
+      security:
+      - CSRFToken: []
+      summary: Permanently delete several league sessions
       tags:
       - sessions
   /teams:

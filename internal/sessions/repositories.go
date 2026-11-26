@@ -32,6 +32,8 @@ type Repository interface {
 	UpdateSession(ctx context.Context, leagueID, leagueSessionID string, params UpdateLeagueSessionServiceParams) (*LeagueSession, error)
 	SoftDeleteSession(ctx context.Context, leagueID, leagueSessionID string) error
 	PermanentDeleteSession(ctx context.Context, leagueID, leagueSessionID string) error
+	BulkSoftDeleteSessions(ctx context.Context, leagueID string, ids []string) (*BulkDeleteLeagueSessionsResult, error)
+	BulkPermanentDeleteSessions(ctx context.Context, leagueID string, ids []string) (*BulkDeleteLeagueSessionsResult, error)
 	ListSessionWeeks(ctx context.Context, leagueID, leagueSessionID string) ([]LeagueSessionWeek, error)
 }
 

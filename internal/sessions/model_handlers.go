@@ -1,6 +1,10 @@
 package sessions
 
-import "time"
+import (
+	"time"
+
+	"github.com/nguyentanvinh/league-be/internal/platform/handler"
+)
 
 // The validate tags only mark the required fields in swagger; no validator reads them.
 // The service validates the body.
@@ -22,6 +26,23 @@ type UpdateLeagueSessionRequest struct {
 	EndsOn      *string              `json:"ends_on,omitempty" format:"date" example:"2027-04-30"`
 	Status      *LeagueSessionStatus `json:"status,omitempty" swaggertype:"string" enums:"DRAFT,IN_PROGRESS,COMPLETE,CANCELLED" example:"IN_PROGRESS"`
 	IsActive    *bool                `json:"is_active,omitempty" example:"true"`
+}
+
+type BulkDeleteLeagueSessionsRequest struct {
+	IDs []string `json:"ids" example:"5e8a2c1d-3b7f-4a90-8c6e-2d1f0b9a7e44"`
+}
+
+// BulkDeleteLeagueSessionsResponse lists every requested session once: deleted, or failed
+// with the error the single delete would have returned.
+type BulkDeleteLeagueSessionsResponse struct {
+	DeletedIDs []string                                 `json:"deleted_ids"`
+	Failed     []BulkDeleteLeagueSessionFailureResponse `json:"failed"`
+}
+
+type BulkDeleteLeagueSessionFailureResponse struct {
+	ID      string            `json:"id"`
+	Code    handler.ErrorCode `json:"code" example:"404001"`
+	Message string            `json:"message" example:"league session not found"`
 }
 
 type LeagueSessionResponse struct {
@@ -74,4 +95,19 @@ func newLeagueSessionWeekResponse(week LeagueSessionWeek) LeagueSessionWeekRespo
 		SubmittedCount:   int(week.SubmittedCount),
 		FirstScheduledAt: week.FirstScheduledAt,
 	}
+}
+
+// newBulkDeleteLeagueSessionsResponse serves each failure as its public code and message;
+// handler.AsAPIError turns an unclassified error into 500001 without its cause.
+func newBulkDeleteLeagueSessionsResponse(result BulkDeleteLeagueSessionsResult) BulkDeleteLeagueSessionsResponse {
+	failed := make([]BulkDeleteLeagueSessionFailureResponse, 0, len(result.Failures))
+	for _, failure := range result.Failures {
+		apiErr := handler.AsAPIError(failure.Err)
+		failed = append(failed, BulkDeleteLeagueSessionFailureResponse{
+			ID:      failure.LeagueSessionID,
+			Code:    apiErr.Code,
+			Message: apiErr.Message,
+		})
+	}
+	return BulkDeleteLeagueSessionsResponse{DeletedIDs: result.DeletedIDs, Failed: failed}
 }

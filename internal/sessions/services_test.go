@@ -35,6 +35,30 @@ type fakeRepository struct {
 	listed           []LeagueSession
 	listedParams     *ListLeagueSessionsServiceParams
 	counted          bool
+	bulkCalledIDs    []string
+	bulkFailures     map[string]error
+}
+
+func (f *fakeRepository) bulkDelete(ids []string) (*BulkDeleteLeagueSessionsResult, error) {
+	if f.writeErr != nil {
+		return nil, f.writeErr
+	}
+	f.bulkCalledIDs = ids
+	var deletedIDs []string
+	for _, id := range ids {
+		if f.bulkFailures[id] == nil {
+			deletedIDs = append(deletedIDs, id)
+		}
+	}
+	return newBulkDeleteLeagueSessionsResult(ids, deletedIDs, func(id string) error { return f.bulkFailures[id] }), nil
+}
+
+func (f *fakeRepository) BulkSoftDeleteSessions(_ context.Context, _ string, ids []string) (*BulkDeleteLeagueSessionsResult, error) {
+	return f.bulkDelete(ids)
+}
+
+func (f *fakeRepository) BulkPermanentDeleteSessions(_ context.Context, _ string, ids []string) (*BulkDeleteLeagueSessionsResult, error) {
+	return f.bulkDelete(ids)
 }
 
 func (f *fakeRepository) ListSessions(_ context.Context, _ string, params ListLeagueSessionsServiceParams) ([]LeagueSession, error) {
@@ -443,6 +467,145 @@ func TestListLeagueSessionsRejectsBadCursor(t *testing.T) {
 			}
 			if reached := repo.listedParams != nil; reached != (tt.wantCode == 0) {
 				t.Errorf("repository reached = %v, want %v", reached, tt.wantCode == 0)
+			}
+		})
+	}
+}
+
+// A malformed request is rejected whole, before the database: an id that is not a uuid
+// would otherwise fail the ::uuid[] cast and 500 the batch, and an unbounded list lets one
+// request rewrite every session.
+func TestBulkDeleteLeagueSessionsRequestIsValidated(t *testing.T) {
+	uniqueIDs := func(n int) []string {
+		ids := make([]string, n)
+		for i := range ids {
+			ids[i] = fmt.Sprintf("00000000-0000-4000-8000-%012d", i)
+		}
+		return ids
+	}
+
+	tests := []struct {
+		name        string
+		ids         []string
+		wantCode    handler.ErrorCode
+		wantReached int
+	}{
+		{"no ids", nil, handler.CodeValidationFailed, 0},
+		{"one not a uuid", []string{testLeagueSessionID, "abc"}, handler.CodeValidationFailed, 0},
+		{"over the limit", uniqueIDs(maxBulkLeagueSessionIDs + 1), handler.CodeValidationFailed, 0},
+		{"at the limit", uniqueIDs(maxBulkLeagueSessionIDs), 0, maxBulkLeagueSessionIDs},
+		{"repeats count once", append(uniqueIDs(maxBulkLeagueSessionIDs), uniqueIDs(maxBulkLeagueSessionIDs)...), 0, maxBulkLeagueSessionIDs},
+		{"a repeat in upper case counts once", []string{testLeagueSessionID, strings.ToUpper(testLeagueSessionID)}, 0, 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{}
+			_, err := NewService(repo, testLogger).BulkSoftDeleteSessions(context.Background(), tt.ids)
+
+			if got := errorCode(err); got != tt.wantCode {
+				t.Fatalf("error code = %d, want %d (err: %v)", got, tt.wantCode, err)
+			}
+			if len(repo.bulkCalledIDs) != tt.wantReached {
+				t.Errorf("sessions reaching the repository = %d, want %d", len(repo.bulkCalledIDs), tt.wantReached)
+			}
+		})
+	}
+
+	t.Run("ids reach the repository canonical", func(t *testing.T) {
+		repo := &fakeRepository{}
+		_, err := NewService(repo, testLogger).
+			BulkPermanentDeleteSessions(context.Background(), []string{strings.ToUpper(testLeagueSessionID), "{" + testLeagueID + "}"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := strings.Join(repo.bulkCalledIDs, ","), testLeagueSessionID+","+testLeagueID; got != want {
+			t.Errorf("ids passed = %s, want %s", got, want)
+		}
+	})
+}
+
+// Best effort: a session that cannot be deleted is reported with the code the single
+// delete returns, and the others are still deleted. A failure of the statement itself
+// fails the whole request, as a 500 without its cause.
+func TestBulkDeleteLeagueSessionsIsBestEffort(t *testing.T) {
+	const (
+		missingID = "55555555-5555-4555-8555-555555555555"
+		liveID    = "66666666-6666-4666-8666-666666666666"
+		sharedID  = "77777777-7777-4777-8777-777777777777"
+	)
+
+	repo := &fakeRepository{bulkFailures: map[string]error{
+		missingID: ErrLeagueSessionNotFound,
+		liveID:    ErrLeagueSessionNotSoftDeleted,
+		sharedID:  ErrLeagueSessionHasSharedTeams,
+	}}
+	result, err := NewService(repo, testLogger).
+		BulkPermanentDeleteSessions(context.Background(), []string{missingID, testLeagueSessionID, liveID, sharedID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.DeletedIDs) != 1 || result.DeletedIDs[0] != testLeagueSessionID {
+		t.Errorf("deleted = %v, want only %s", result.DeletedIDs, testLeagueSessionID)
+	}
+	wantCodes := map[string]handler.ErrorCode{
+		missingID: handler.CodeNotFound,
+		liveID:    handler.CodeConflict,
+		sharedID:  handler.CodeConflict,
+	}
+	response := newBulkDeleteLeagueSessionsResponse(*result)
+	if len(response.Failed) != len(wantCodes) {
+		t.Fatalf("failed = %+v, want %d entries", response.Failed, len(wantCodes))
+	}
+	for _, failure := range response.Failed {
+		if failure.Code != wantCodes[failure.ID] || failure.Message == "" {
+			t.Errorf("%s served as %d %q, want %d with a message", failure.ID, failure.Code, failure.Message, wantCodes[failure.ID])
+		}
+	}
+
+	t.Run("statement failure fails the request", func(t *testing.T) {
+		repo := &fakeRepository{writeErr: errors.New("connection reset")}
+		_, err := NewService(repo, testLogger).BulkSoftDeleteSessions(context.Background(), []string{testLeagueSessionID})
+		if got := errorCode(err); got != handler.CodeInternal {
+			t.Errorf("code = %d, want %d", got, handler.CodeInternal)
+		}
+	})
+}
+
+// Every requested id appears exactly once, in request order, so the admin page can match
+// each row it sent to an outcome.
+func TestNewBulkDeleteLeagueSessionsResult(t *testing.T) {
+	result := newBulkDeleteLeagueSessionsResult([]string{"a", "b", "c"}, []string{"c", "a"},
+		func(string) error { return ErrLeagueSessionNotFound })
+
+	if got := strings.Join(result.DeletedIDs, ","); got != "a,c" {
+		t.Errorf("deleted = %s, want a,c", got)
+	}
+	if len(result.Failures) != 1 || result.Failures[0].LeagueSessionID != "b" {
+		t.Errorf("failures = %+v, want only b", result.Failures)
+	}
+}
+
+// The single permanent delete and the bulk one decide from the same state, so a session
+// one refuses the other refuses with the same error.
+func TestLeagueSessionDeleteStateFailure(t *testing.T) {
+	tests := []struct {
+		name  string
+		state leagueSessionDeleteState
+		want  error
+	}{
+		{"missing", leagueSessionDeleteState{}, ErrLeagueSessionNotFound},
+		{"live", leagueSessionDeleteState{SessionExists: true}, ErrLeagueSessionNotSoftDeleted},
+		{"live with shared teams", leagueSessionDeleteState{SessionExists: true, HasSharedTeams: true}, ErrLeagueSessionNotSoftDeleted},
+		{"deleted with shared teams", leagueSessionDeleteState{SessionExists: true, IsDeleted: true, HasSharedTeams: true}, ErrLeagueSessionHasSharedTeams},
+		{"deletable", leagueSessionDeleteState{SessionExists: true, IsDeleted: true}, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.state.deleteFailure(); !errors.Is(got, tt.want) || (tt.want == nil && got != nil) {
+				t.Errorf("deleteFailure = %v, want %v", got, tt.want)
 			}
 		})
 	}

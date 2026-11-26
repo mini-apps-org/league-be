@@ -1,6 +1,6 @@
 package sessions
 
-// Writes: create, update, and soft and permanent delete. A constraint a write trips is mapped to its
+// Writes: create, update, and soft and permanent delete, singly and in bulk. A constraint a write trips is mapped to its
 // sentinel by constraintError.
 
 import (
@@ -173,54 +173,80 @@ WHERE league_id = $1 AND id = $2 AND NOT is_deleted`
 	return nil
 }
 
-// PermanentDeleteSession removes a soft-deleted session. It refuses one that homes a team
-// (teams.division_id) which has also entered a division of another session: the cascade
-// through teams.division_id would delete that team from the other session too, roster
-// included.
-func (r *repository) PermanentDeleteSession(ctx context.Context, leagueID, leagueSessionID string) error {
-	// FOR UPDATE serialises two permanent deletes of the same session, so the second
-	// answers 404 rather than racing the first through the checks.
-	const stateQuery = `SELECT is_deleted FROM league_sessions WHERE league_id = $1 AND id = $2 FOR UPDATE`
-	const sharedTeamsQuery = `
-SELECT EXISTS (
+// leagueSessionHomesSharedTeams is true for the session ls when it homes a team
+// (teams.division_id) that has also entered a division of another session. A permanent
+// delete refuses such a session: the cascade through teams.division_id would delete that
+// team from the other session too, roster included.
+const leagueSessionHomesSharedTeams = `EXISTS (
     SELECT 1
     FROM teams t
     JOIN divisions home    ON home.id = t.division_id
     JOIN division_teams dt ON dt.team_id = t.id
     JOIN divisions other   ON other.id = dt.division_id
-    WHERE home.season_id = $1 AND other.season_id <> $1
+    WHERE home.season_id = ls.id AND other.season_id <> ls.id
 )`
+
+// leagueSessionDeleteState is what a permanent delete reads to decide, or to explain, why a
+// session stays.
+type leagueSessionDeleteState struct {
+	ID             string `db:"id"`
+	SessionExists  bool   `db:"session_exists"`
+	IsDeleted      bool   `db:"is_deleted"`
+	HasSharedTeams bool   `db:"has_shared_teams"`
+}
+
+// deleteFailure is the sentinel the single permanent delete returns for a session in
+// this state, or nil when it may be deleted.
+func (state leagueSessionDeleteState) deleteFailure() error {
+	switch {
+	case !state.SessionExists:
+		return ErrLeagueSessionNotFound
+	case !state.IsDeleted:
+		return ErrLeagueSessionNotSoftDeleted
+	case state.HasSharedTeams:
+		return ErrLeagueSessionHasSharedTeams
+	default:
+		return nil
+	}
+}
+
+// PermanentDeleteSession removes a soft-deleted session that homes no shared team (see
+// leagueSessionHomesSharedTeams).
+func (r *repository) PermanentDeleteSession(ctx context.Context, leagueID, leagueSessionID string) error {
+	// FOR UPDATE serialises two permanent deletes of the same session, so the second
+	// answers 404 rather than racing the first through the checks.
+	const stateQuery = `
+SELECT
+    ls.id                                    AS id,
+    true                                     AS session_exists,
+    ls.is_deleted                            AS is_deleted,
+    ` + leagueSessionHomesSharedTeams + ` AS has_shared_teams
+FROM league_sessions ls
+WHERE ls.league_id = $1 AND ls.id = $2
+FOR UPDATE`
 	const deleteQuery = `DELETE FROM league_sessions WHERE league_id = $1 AND id = $2 AND is_deleted`
-	sessionArgs := []any{
+	args := []any{
 		leagueID,        // $1 league_id
 		leagueSessionID, // $2 id
 	}
-	sharedTeamsArgs := []any{
-		leagueSessionID,
-	}
 
 	err := pgx.BeginFunc(ctx, r.conn(ctx), func(tx pgx.Tx) error {
-		var isDeleted bool
-		err := tx.QueryRow(ctx, stateQuery, sessionArgs...).Scan(&isDeleted)
+		rows, err := tx.Query(ctx, stateQuery, args...)
+		if err != nil {
+			return err
+		}
+		state, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[leagueSessionDeleteState])
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrLeagueSessionNotFound
 		}
 		if err != nil {
 			return err
 		}
-		if !isDeleted {
-			return ErrLeagueSessionNotSoftDeleted
+		if failure := state.deleteFailure(); failure != nil {
+			return failure
 		}
 
-		var hasSharedTeams bool
-		if err := tx.QueryRow(ctx, sharedTeamsQuery, sharedTeamsArgs...).Scan(&hasSharedTeams); err != nil {
-			return err
-		}
-		if hasSharedTeams {
-			return ErrLeagueSessionHasSharedTeams
-		}
-
-		_, err = tx.Exec(ctx, deleteQuery, sessionArgs...)
+		_, err = tx.Exec(ctx, deleteQuery, args...)
 		return err
 	})
 	if errors.Is(err, ErrLeagueSessionNotFound) ||
@@ -235,6 +261,125 @@ SELECT EXISTS (
 		return fmt.Errorf("sessions: permanently delete league session %s: %w", leagueSessionID, err)
 	}
 	return nil
+}
+
+// BulkSoftDeleteSessions soft-deletes every live session of the league in ids, in one
+// statement. A requested session it did not delete was missing or already deleted:
+// ErrLeagueSessionNotFound, as SoftDeleteSession reports. ids must be canonical uuids.
+func (r *repository) BulkSoftDeleteSessions(ctx context.Context, leagueID string, ids []string) (*BulkDeleteLeagueSessionsResult, error) {
+	const query = `
+UPDATE league_sessions SET
+    is_deleted = true,
+    is_active  = false,
+    updated_at = now()
+WHERE league_id = $1 AND id = ANY($2::uuid[]) AND NOT is_deleted
+RETURNING id`
+	args := []any{
+		leagueID, // $1 league_id
+		ids,      // $2 session ids
+	}
+
+	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("sessions: bulk soft delete league sessions: %w", err)
+	}
+	deletedIDs, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, fmt.Errorf("sessions: bulk soft delete league sessions: %w", err)
+	}
+
+	return newBulkDeleteLeagueSessionsResult(ids, deletedIDs, func(string) error { return ErrLeagueSessionNotFound }), nil
+}
+
+// BulkPermanentDeleteSessions removes every soft-deleted session of the league in ids that
+// homes no shared team, then reads why each other one stayed, as PermanentDeleteSession
+// would report it. Two statements in one transaction. ids must be canonical uuids.
+func (r *repository) BulkPermanentDeleteSessions(ctx context.Context, leagueID string, ids []string) (*BulkDeleteLeagueSessionsResult, error) {
+	// A session with shared teams is skipped here rather than left to the team_matches
+	// foreign keys: a violation aborts the whole statement, and with it every other session.
+	const deleteQuery = `
+DELETE FROM league_sessions ls
+WHERE ls.league_id = $1
+  AND ls.id = ANY($2::uuid[])
+  AND ls.is_deleted
+  AND NOT ` + leagueSessionHomesSharedTeams + `
+RETURNING ls.id`
+	const stateQuery = `
+SELECT
+    requested.id                             AS id,
+    ls.id IS NOT NULL                        AS session_exists,
+    COALESCE(ls.is_deleted, false)           AS is_deleted,
+    ` + leagueSessionHomesSharedTeams + ` AS has_shared_teams
+FROM unnest($2::uuid[]) AS requested (id)
+LEFT JOIN league_sessions ls ON ls.id = requested.id AND ls.league_id = $1`
+	args := []any{
+		leagueID, // $1 league_id
+		ids,      // $2 session ids
+	}
+
+	var (
+		deletedIDs []string
+		states     = map[string]leagueSessionDeleteState{}
+	)
+	err := pgx.BeginFunc(ctx, r.conn(ctx), func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, deleteQuery, args...)
+		if err != nil {
+			return err
+		}
+		if deletedIDs, err = pgx.CollectRows(rows, pgx.RowTo[string]); err != nil {
+			return err
+		}
+
+		rows, err = tx.Query(ctx, stateQuery, args...)
+		if err != nil {
+			return err
+		}
+		found, err := pgx.CollectRows(rows, pgx.RowToStructByName[leagueSessionDeleteState])
+		if err != nil {
+			return err
+		}
+		for _, state := range found {
+			states[state.ID] = state
+		}
+		return nil
+	})
+	// Only a team entering another session between the NOT EXISTS and the cascade reaches
+	// the foreign keys: the whole batch then fails as ErrLeagueSessionHasSharedTeams.
+	if sentinel := constraintError(err); sentinel != nil {
+		return nil, sentinel
+	}
+	if err != nil {
+		return nil, fmt.Errorf("sessions: bulk permanently delete league sessions: %w", err)
+	}
+
+	return newBulkDeleteLeagueSessionsResult(ids, deletedIDs, func(id string) error {
+		if failure := states[id].deleteFailure(); failure != nil {
+			return failure
+		}
+		// Deletable now but not when the DELETE ran: a session whose last shared team left
+		// in between. Retrying deletes it.
+		return ErrLeagueSessionHasSharedTeams
+	}), nil
+}
+
+// newBulkDeleteLeagueSessionsResult lists each requested id exactly once, in request
+// order: in DeletedIDs when the statement returned it, otherwise in Failures with
+// failureOf(id).
+func newBulkDeleteLeagueSessionsResult(requestedIDs, deletedIDs []string, failureOf func(id string) error) *BulkDeleteLeagueSessionsResult {
+	deleted := make(map[string]bool, len(deletedIDs))
+	for _, id := range deletedIDs {
+		deleted[id] = true
+	}
+
+	result := &BulkDeleteLeagueSessionsResult{DeletedIDs: []string{}, Failures: []BulkDeleteLeagueSessionFailure{}}
+	for _, id := range requestedIDs {
+		if deleted[id] {
+			result.DeletedIDs = append(result.DeletedIDs, id)
+			continue
+		}
+		result.Failures = append(result.Failures, BulkDeleteLeagueSessionFailure{LeagueSessionID: id, Err: failureOf(id)})
+	}
+	return result
 }
 
 // constraintError returns the sentinel for the constraint err violated, or nil when err
